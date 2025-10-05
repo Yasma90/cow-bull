@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net6.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <AssemblyName>CowBullServer</AssemblyName>
+    <RootNamespace>CowBullServer</RootNamespace>
+    <ApplicationIcon />
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DebugType>full</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <DefineConstants>TRACE</DefineConstants>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="7.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="7.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="7.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="7.0.1" />
+    <PackageReference Include="System.Text.Json" Version="7.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CowBull.Common\CowBull.Common.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Model\ServerConnection.cs" />
+    <Compile Remove="Model\Mensaje_Data.cs" />
+  </ItemGroup>
+
+  <!-- Legacy files to be gradually migrated -->
+  <ItemGroup>
+    <Compile Include="Model\Chronometer.cs" />
+    <Compile Include="Model\Configuration.cs" />
+    <Compile Include="Model\cTimer.cs" />
+    <Compile Include="Model\Loggin.cs" />
+    <Compile Include="Model\Mixer.cs" />
+    <Compile Include="Model\NumeroJugado.cs" />
+    <Compile Include="Model\Send_Data.cs" />
+    <Compile Include="Model\Sound.cs" />
+    <Compile Include="Model\CowBulls.cs" />
+    <Compile Include="Model\CowBullVsPC.cs" />
+    <Compile Include="ViewModel\RelayCommand.cs" />
+    <Compile Include="ViewModel\VModelPlay.cs" />
+  </ItemGroup>
+
+</Project>
