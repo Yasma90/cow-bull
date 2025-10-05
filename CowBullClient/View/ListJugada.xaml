@@ -1,0 +1,28 @@
+﻿<UserControl x:Class="CowBullClient.View.ListJugada"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:resolt="clr-namespace:CowBullClient.View"
+             mc:Ignorable="d" Width="NaN" Height="NaN">
+
+    <ScrollViewer>
+        <StackPanel Orientation="Horizontal" >
+            <ListView Background="Transparent" OverridesDefaultStyle="False" ItemsSource="{Binding GameUser}">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal">
+                            <resolt:Resultado></resolt:Resultado>
+                            <!--<Image Width="25" Height="25" Source="{Binding ImageSrc}"/>
+                            <Label Content="{Binding Nombre}" Foreground="White" FontSize="12" FontFamily="Comic Sans MS" />
+                            <Button Background="Transparent" Foreground="White" FontSize="12" FontFamily="Comic Sans MS"
+									Content="Ver Salario" Command="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type UserControl}},Path=DataContext.CalcularSalarioCommand}"
+									CommandParameter="{Binding}"/>-->
+                        </StackPanel>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </StackPanel>
+    </ScrollViewer>
+
+</UserControl>

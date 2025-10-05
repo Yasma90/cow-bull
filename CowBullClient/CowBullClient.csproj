@@ -1,0 +1,199 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{A7E1B9D7-B11F-4D98-A66C-171E287E3549}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>CowBullClient</RootNamespace>
+    <AssemblyName>CowBullClient</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
+    <WarningLevel>4</WarningLevel>
+    <TargetFrameworkProfile>
+    </TargetFrameworkProfile>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="System.Xaml">
+      <RequiredTargetFramework>4.0</RequiredTargetFramework>
+    </Reference>
+    <Reference Include="WindowsBase" />
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+  </ItemGroup>
+  <ItemGroup>
+    <ApplicationDefinition Include="App.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </ApplicationDefinition>
+    <Compile Include="Model\Chronometer.cs" />
+    <Compile Include="Model\Connection.cs" />
+    <Compile Include="Model\cTimer.cs" />
+    <Compile Include="Model\Loggin.cs" />
+    <Compile Include="Model\Mensaje_Data.cs" />
+    <Compile Include="Model\Mixer.cs" />
+    <Compile Include="Model\NumeroJugado.cs" />
+    <Compile Include="Model\Sound.cs" />
+    <Compile Include="Model\CowBulls.cs" />
+    <Compile Include="Model\CowBullVsPC.cs" />
+    <Compile Include="ViewModel\RelayCommand.cs" />
+    <Compile Include="ViewModel\VModelPlay.cs" />
+    <Compile Include="View\Configuration.xaml.cs">
+      <DependentUpon>Configuration.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\ListJugada.xaml.cs" />
+    <Compile Include="View\MainControl.xaml.cs" />
+    <Compile Include="View\MainWindow.xaml.cs" />
+    <Compile Include="View\Resultado.xaml.cs" />
+    <Compile Include="View\SendNumber.xaml.cs" />
+    <Compile Include="App.xaml.cs">
+      <DependentUpon>App.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Page Include="Resources\Style\Style.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="View\Configuration.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\ListJugada.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="View\MainControl.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="View\MainWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="View\Resultado.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="View\SendNumber.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Properties\AssemblyInfo.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Properties\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+    <Compile Include="Properties\Settings.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+    </Compile>
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+    <None Include="Properties\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
+    <AppDesigner Include="Properties\" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Resources\abs__ic_ab_back_holo_light.png" />
+    <Resource Include="Resources\abs__ic_cab_done_holo_light.png" />
+    <Resource Include="Resources\abs__ic_clear_normal.png" />
+    <Resource Include="Resources\abs__ic_clear_search_api_disabled_holo_light.png" />
+    <Resource Include="Resources\abs__ic_clear_search_api_holo_light.png" />
+    <Resource Include="Resources\abs__ic_go.png" />
+    <Resource Include="Resources\abs__ic_go_search_api_holo_light.png" />
+    <Resource Include="Resources\abs__ic_menu_moreoverflow_normal_holo_light.png" />
+    <Resource Include="Resources\abs__ic_menu_share_holo_light.png" />
+    <Resource Include="Resources\abs__ic_search.png" />
+    <Resource Include="Resources\abs__ic_search_api_holo_light.png" />
+    <Resource Include="Resources\abs__ic_voice_search.png" />
+    <Resource Include="Resources\abs__ic_voice_search_api_holo_light.png" />
+    <Resource Include="Resources\app.JPG" />
+    <Resource Include="Resources\baca toro.JPG" />
+    <Resource Include="Resources\fondo.png" />
+    <Resource Include="Resources\fondo_main.png" />
+    <Resource Include="Resources\ic.png" />
+    <Resource Include="Resources\ic_action_about.png" />
+    <Resource Include="Resources\ic_action_bad.png" />
+    <Resource Include="Resources\ic_action_bad_black.png" />
+    <Resource Include="Resources\ic_action_camera.png" />
+    <Resource Include="Resources\ic_action_good.png" />
+    <Resource Include="Resources\ic_action_good_black.png" />
+    <Resource Include="Resources\ic_action_help.png" />
+    <Resource Include="Resources\ic_action_overflow.png" />
+    <Resource Include="Resources\ic_action_refresh.png" />
+    <Resource Include="Resources\ic_action_share.png" />
+    <Resource Include="Resources\ic_action_volume_muted.png" />
+    <Resource Include="Resources\ic_action_volume_on.png" />
+    <Resource Include="Resources\ic_launch.png" />
+    <Resource Include="Resources\ic_launcher.ico" />
+    <Resource Include="Resources\ic_launcher.png" />
+    <Resource Include="Resources\ic_launchr.png" />
+    <Resource Include="Resources\next.png" />
+    <Resource Include="Resources\pause.png" />
+    <Resource Include="Resources\play.png" />
+    <Resource Include="Resources\prev.png" />
+    <Resource Include="Resources\toro.png" />
+    <Resource Include="Resources\toro_viejo.png" />
+    <Resource Include="Resources\vaca.png" />
+    <Resource Include="Resources\vaca_vieja.png" />
+    <Resource Include="Resources\[001027].png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Resources\Sound\sonido_ganador.mp3" />
+    <Content Include="Resources\Sound\sonido_obturador_camara.mp3" />
+    <Content Include="Resources\Sound\sonido_penultima_jugada.mp3" />
+    <Content Include="Resources\Sound\sonido_perdedor.mp3" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>
