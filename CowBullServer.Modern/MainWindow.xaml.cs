@@ -1,10 +1,16 @@
 using System;
+using System.Collections.Concurrent;
 using System.ComponentModel;
+using System.Net;
+using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using Microsoft.Extensions.Logging;
 using CowBull.Common.Services;
+using CowBull.Common.Infrastructure;
+using CowBull.Common.Models;
 
 namespace CowBullServer.Modern
 {
@@ -24,15 +30,18 @@ namespace CowBullServer.Modern
     {
         private readonly ILogger<MainViewModel> _logger;
         private readonly IGameService _gameService;
+        private TcpListener? _tcpListener;
+        private CancellationTokenSource? _cancellationTokenSource;
+        private readonly ConcurrentDictionary<string, TcpClient> _connectedClients;
         private bool _isServerRunning = false;
         private string _serverStatus = "Stopped";
-        private int _connectedClients = 0;
         private string _logMessages = string.Empty;
 
         public MainViewModel()
         {
             _logger = new ConsoleLogger<MainViewModel>();
             _gameService = new GameService(new ConsoleLogger<GameService>());
+            _connectedClients = new ConcurrentDictionary<string, TcpClient>();
             
             StartServerCommand = new RelayCommand(async () => await StartServerAsync(), () => !IsServerRunning);
             StopServerCommand = new RelayCommand(async () => await StopServerAsync(), () => IsServerRunning);
@@ -60,12 +69,7 @@ namespace CowBullServer.Modern
 
         public int ConnectedClients
         {
-            get => _connectedClients;
-            set
-            {
-                _connectedClients = value;
-                OnPropertyChanged(nameof(ConnectedClients));
-            }
+            get => _connectedClients.Count;
         }
 
         public string LogMessages
@@ -89,11 +93,18 @@ namespace CowBullServer.Modern
                 ServerStatus = "Starting...";
                 AddLogMessage("Server starting...");
                 
-                // Simulate server start
-                await Task.Delay(1000);
+                // Crear y configurar TcpListener real
+                _tcpListener = new TcpListener(IPAddress.Any, 4510);
+                _tcpListener.Start();
+                
+                _cancellationTokenSource = new CancellationTokenSource();
+                
+                // Iniciar tarea para aceptar clientes
+                _ = Task.Run(() => AcceptClientsAsync(_cancellationTokenSource.Token));
                 
                 ServerStatus = "Running on port 4510";
                 AddLogMessage("Server started successfully on port 4510");
+                AddLogMessage("Waiting for client connections...");
             }
             catch (Exception ex)
             {
@@ -110,13 +121,31 @@ namespace CowBullServer.Modern
                 ServerStatus = "Stopping...";
                 AddLogMessage("Server stopping...");
                 
-                // Simulate server stop
-                await Task.Delay(500);
+                // Cancelar tareas y cerrar conexiones
+                _cancellationTokenSource?.Cancel();
+                
+                // Cerrar todas las conexiones de clientes
+                foreach (var client in _connectedClients.Values)
+                {
+                    try
+                    {
+                        client.Close();
+                    }
+                    catch { /* Ignorar errores al cerrar */ }
+                }
+                _connectedClients.Clear();
+                
+                // Parar el listener
+                _tcpListener?.Stop();
+                _tcpListener = null;
+                
+                await Task.Delay(500); // Dar tiempo para limpiar
                 
                 IsServerRunning = false;
                 ServerStatus = "Stopped";
-                ConnectedClients = 0;
+                OnPropertyChanged(nameof(ConnectedClients));
                 AddLogMessage("Server stopped");
+                AddLogMessage("All clients disconnected");
             }
             catch (Exception ex)
             {
@@ -125,6 +154,92 @@ namespace CowBullServer.Modern
             }
         }
 
+        private async Task AcceptClientsAsync(CancellationToken cancellationToken)
+        {
+            while (!cancellationToken.IsCancellationRequested && _tcpListener != null)
+            {
+                try
+                {
+                    var tcpClient = await _tcpListener.AcceptTcpClientAsync();
+                    var clientId = Guid.NewGuid().ToString();
+                    var remoteEndPoint = tcpClient.Client.RemoteEndPoint?.ToString() ?? "Unknown";
+                    
+                    _connectedClients.TryAdd(clientId, tcpClient);
+                    
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        OnPropertyChanged(nameof(ConnectedClients));
+                        AddLogMessage($"Client connected: {clientId} from {remoteEndPoint}");
+                    });
+                    
+                    // Manejar cliente en tarea separada
+                    _ = Task.Run(() => HandleClientAsync(clientId, tcpClient, cancellationToken));
+                }
+                catch (ObjectDisposedException)
+                {
+                    // TcpListener fue cerrado, salir del bucle
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    if (!cancellationToken.IsCancellationRequested)
+                    {
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            AddLogMessage($"Error accepting client: {ex.Message}");
+                        });
+                    }
+                }
+            }
+        }
+        
+        private async Task HandleClientAsync(string clientId, TcpClient tcpClient, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var stream = tcpClient.GetStream();
+                var buffer = new byte[1024];
+                
+                while (!cancellationToken.IsCancellationRequested && tcpClient.Connected)
+                {
+                    var bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken);
+                    if (bytesRead == 0)
+                    {
+                        // Cliente desconectado
+                        break;
+                    }
+                    
+                    // Aquí se procesarían los mensajes del cliente
+                    // Por ahora solo mantenemos la conexión viva
+                }
+            }
+            catch (Exception ex)
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    AddLogMessage($"Error handling client {clientId}: {ex.Message}");
+                });
+            }
+            finally
+            {
+                // Remover cliente cuando se desconecta
+                if (_connectedClients.TryRemove(clientId, out var removedClient))
+                {
+                    try
+                    {
+                        removedClient.Close();
+                    }
+                    catch { /* Ignorar errores al cerrar */ }
+                    
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        OnPropertyChanged(nameof(ConnectedClients));
+                        AddLogMessage($"Client disconnected: {clientId}");
+                    });
+                }
+            }
+        }
+        
         private void AddLogMessage(string message)
         {
             var timestamp = DateTime.Now.ToString("HH:mm:ss");

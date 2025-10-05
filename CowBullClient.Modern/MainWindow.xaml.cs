@@ -2,11 +2,15 @@ using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
+using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using Microsoft.Extensions.Logging;
 using CowBull.Common.Services;
+using CowBull.Common.Infrastructure;
+using CowBull.Common.Models;
 
 namespace CowBullClient.Modern
 {
@@ -34,6 +38,7 @@ namespace CowBullClient.Modern
     {
         private readonly ILogger<MainViewModel> _logger;
         private readonly IGameService _gameService;
+        private TcpClient? _tcpClient;
         private GameSession? _currentSession;
         private string _secretNumber = string.Empty;
         private bool _isConnected = false;
@@ -140,18 +145,31 @@ namespace CowBullClient.Modern
                 ConnectionStatus = "Connecting...";
                 _logger.LogInformation("Connecting to server...");
                 
-                // Simulate connection
-                await Task.Delay(1000);
+                // Crear conexión TCP real
+                _tcpClient = new TcpClient();
+                await _tcpClient.ConnectAsync("127.0.0.1", 4510);
                 
-                IsConnected = true;
-                ConnectionStatus = "Connected to 127.0.0.1:4510";
-                GameMessage = "Connected! Click 'New Game' to start playing.";
-                _logger.LogInformation("Connected to server");
+                if (_tcpClient.Connected)
+                {
+                    IsConnected = true;
+                    ConnectionStatus = "Connected to 127.0.0.1:4510";
+                    GameMessage = "Connected! Click 'New Game' to start playing.";
+                    _logger.LogInformation("Connected to server");
+                    
+                    // Mantener conexión viva
+                    _ = Task.Run(KeepConnectionAlive);
+                }
+                else
+                {
+                    throw new Exception("Failed to connect to server");
+                }
             }
             catch (Exception ex)
             {
                 ConnectionStatus = $"Connection failed: {ex.Message}";
                 _logger.LogError(ex, "Connection failed");
+                _tcpClient?.Close();
+                _tcpClient = null;
             }
         }
 
@@ -162,7 +180,13 @@ namespace CowBullClient.Modern
                 ConnectionStatus = "Disconnecting...";
                 _logger.LogInformation("Disconnecting from server...");
                 
-                // Simulate disconnection
+                // Cerrar conexión TCP real
+                if (_tcpClient != null)
+                {
+                    _tcpClient.Close();
+                    _tcpClient = null;
+                }
+                
                 await Task.Delay(500);
                 
                 IsConnected = false;
@@ -269,6 +293,30 @@ namespace CowBullClient.Modern
             GameInProgress = false;
             GameMessage = $"Te rendiste. El número secreto era {_secretNumber}.";
             _logger.LogInformation("El jugador se rindió. Número secreto: {SecretNumber}", _secretNumber);
+        }
+
+        private async Task KeepConnectionAlive()
+        {
+            try
+            {
+                while (_tcpClient != null && _tcpClient.Connected && IsConnected)
+                {
+                    // Mantener la conexión viva
+                    await Task.Delay(1000);
+                }
+            }
+            catch (Exception ex)
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    _logger.LogError(ex, "Connection lost");
+                    IsConnected = false;
+                    ConnectionStatus = "Connection lost";
+                    GameInProgress = false;
+                    _tcpClient?.Close();
+                    _tcpClient = null;
+                });
+            }
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
