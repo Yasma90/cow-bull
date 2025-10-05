@@ -54,6 +54,7 @@ namespace CowBullClient.Modern
             DisconnectCommand = new RelayCommand(async () => await DisconnectAsync(), () => IsConnected);
             NewGameCommand = new RelayCommand(async () => await NewGameAsync(), () => IsConnected);
             SendGuessCommand = new RelayCommand(async () => await SendGuessAsync(), () => CanSendGuess());
+            SurrenderCommand = new RelayCommand(async () => await SurrenderAsync(), () => GameInProgress);
         }
 
         public ObservableCollection<GameAttempt> GameAttempts { get; }
@@ -122,6 +123,7 @@ namespace CowBullClient.Modern
         public ICommand DisconnectCommand { get; }
         public ICommand NewGameCommand { get; }
         public ICommand SendGuessCommand { get; }
+        public ICommand SurrenderCommand { get; }
 
         private bool CanSendGuess()
         {
@@ -258,6 +260,15 @@ namespace CowBullClient.Modern
                 GameMessage = $"Error processing guess: {ex.Message}";
                 _logger.LogError(ex, "Error processing guess");
             }
+        }
+
+        private async Task SurrenderAsync()
+        {
+            if (!GameInProgress)
+                return;
+            GameInProgress = false;
+            GameMessage = $"Te rendiste. El número secreto era {_secretNumber}.";
+            _logger.LogInformation("El jugador se rindió. Número secreto: {SecretNumber}", _secretNumber);
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

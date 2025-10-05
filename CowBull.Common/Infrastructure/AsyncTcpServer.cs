@@ -20,6 +20,12 @@ namespace CowBull.Common.Infrastructure
     /// </summary>
     public class AsyncTcpServer : IDisposable
     {
+        private static readonly JsonSerializerOptions JsonOptions = new()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = false
+        };
+
         private readonly NetworkConfiguration _config;
         private readonly ILogger<AsyncTcpServer> _logger;
         private TcpListener _tcpListener;
@@ -122,12 +128,7 @@ namespace CowBull.Common.Infrastructure
 
             try
             {
-                var jsonMessage = JsonSerializer.Serialize(message, new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                    WriteIndented = false
-                });
-
+                var jsonMessage = JsonSerializer.Serialize(message, JsonOptions);
                 return await SendMessageToClientAsync(clientId, jsonMessage, cancellationToken);
             }
             catch (Exception ex)
@@ -159,12 +160,7 @@ namespace CowBull.Common.Infrastructure
 
             try
             {
-                var jsonMessage = JsonSerializer.Serialize(message, new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                    WriteIndented = false
-                });
-
+                var jsonMessage = JsonSerializer.Serialize(message, JsonOptions);
                 await BroadcastMessageAsync(jsonMessage, cancellationToken);
             }
             catch (Exception ex)
@@ -186,7 +182,7 @@ namespace CowBull.Common.Infrastructure
                         // Handle client connection on a separate task
                         _ = Task.Run(async () => await HandleClientAsync(tcpClient, cancellationToken), cancellationToken);
                     }
-                    catch (Exception ex) when (!(ex is OperationCanceledException))
+                    catch (Exception ex) when (ex is not OperationCanceledException)
                     {
                         _logger.LogError(ex, "Error accepting client connection");
                     }

@@ -42,6 +42,7 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             
             <TextBlock Grid.Column="0" Text="Your Guess:" VerticalAlignment="Center" Margin="0,0,10,0"/>
@@ -49,7 +50,9 @@
                      MaxLength="4" FontSize="14" Height="25" VerticalContentAlignment="Center"/>
             <Button Grid.Column="2" Content="Send Guess" Command="{Binding SendGuessCommand}" 
                     Width="90" Height="25" Margin="10,0,0,0"/>
-            <TextBlock Grid.Column="3" Text="{Binding AttemptsRemaining, StringFormat='Attempts: {0}'}" 
+            <Button Grid.Column="3" Content="Rendirse" Command="{Binding SurrenderCommand}" 
+                    Width="90" Height="25" Margin="10,0,0,0"/>
+            <TextBlock Grid.Column="4" Text="{Binding AttemptsRemaining, StringFormat='Attempts: {0}'}" 
                        VerticalAlignment="Center" Margin="15,0,0,0" FontWeight="Bold"/>
         </Grid>
         
