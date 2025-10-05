@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using Microsoft.Extensions.Logging;
+using CowBull.Common.Services;
 
 namespace CowBullClient.Modern
 {
@@ -32,6 +33,9 @@ namespace CowBullClient.Modern
     public class MainViewModel : INotifyPropertyChanged
     {
         private readonly ILogger<MainViewModel> _logger;
+        private readonly IGameService _gameService;
+        private GameSession? _currentSession;
+        private string _secretNumber = string.Empty;
         private bool _isConnected = false;
         private string _connectionStatus = "Disconnected";
         private string _currentGuess = string.Empty;
@@ -42,6 +46,8 @@ namespace CowBullClient.Modern
         public MainViewModel()
         {
             _logger = new ConsoleLogger<MainViewModel>();
+            var gameLogger = new ConsoleLogger<GameService>();
+            _gameService = new GameService(gameLogger);
             GameAttempts = new ObservableCollection<GameAttempt>();
             
             ConnectCommand = new RelayCommand(async () => await ConnectAsync(), () => !IsConnected);
@@ -177,15 +183,23 @@ namespace CowBullClient.Modern
                 GameMessage = "Starting new game...";
                 _logger.LogInformation("Starting new game...");
                 
-                // Simulate new game start
-                await Task.Delay(500);
+                // Create a new game session using the GameService
+                var config = new GameConfiguration
+                {
+                    NumberLength = 4,
+                    AllowDuplicateDigits = false,
+                    MaxAttempts = 10
+                };
+
+                _currentSession = await _gameService.CreateGameAsync(config);
+                _secretNumber = _currentSession.SecretNumber;
                 
                 GameInProgress = true;
                 AttemptsRemaining = 10;
                 GameAttempts.Clear();
                 CurrentGuess = string.Empty;
                 GameMessage = "New game started! Guess the 4-digit number (no duplicates).";
-                _logger.LogInformation("New game started");
+                _logger.LogInformation("New game started with secret number: {SecretNumber}", _secretNumber);
             }
             catch (Exception ex)
             {
@@ -196,39 +210,40 @@ namespace CowBullClient.Modern
 
         private async Task SendGuessAsync()
         {
-            if (!CanSendGuess()) return;
+            if (!CanSendGuess() || _currentSession == null) return;
 
             try
             {
-                _logger.LogInformation("Sending guess: {Guess}", CurrentGuess);
+                _logger.LogInformation("Processing guess: {Guess} against secret: {Secret}", CurrentGuess, _secretNumber);
                 
-                // Simulate server response
-                await Task.Delay(300);
+                // Use the real game service to process the guess
+                var result = await _gameService.ProcessGuessAsync(_currentSession.SessionId, CurrentGuess);
                 
-                // Generate random response for demo
-                var random = new Random();
-                var bulls = random.Next(0, 5);
-                var cows = random.Next(0, 4 - bulls);
+                if (!result.IsValid)
+                {
+                    GameMessage = result.Message;
+                    return;
+                }
                 
                 var attempt = new GameAttempt
                 {
                     Number = CurrentGuess,
-                    Bulls = bulls,
-                    Cows = cows
+                    Bulls = result.Bulls,
+                    Cows = result.Cows
                 };
                 
                 GameAttempts.Add(attempt);
                 AttemptsRemaining--;
                 
-                if (bulls == 4)
+                if (result.IsGameWon)
                 {
                     GameInProgress = false;
-                    GameMessage = "🎉 Congratulations! You guessed the number!";
+                    GameMessage = $"🎉 Congratulations! You guessed the number {_secretNumber}!";
                 }
                 else if (AttemptsRemaining <= 0)
                 {
                     GameInProgress = false;
-                    GameMessage = "😞 Game over! No more attempts remaining.";
+                    GameMessage = $"😞 Game over! The secret number was {_secretNumber}.";
                 }
                 else
                 {
@@ -236,12 +251,12 @@ namespace CowBullClient.Modern
                 }
                 
                 CurrentGuess = string.Empty;
-                _logger.LogInformation("Guess processed: {Bulls} bulls, {Cows} cows", bulls, cows);
+                _logger.LogInformation("Guess processed: {Bulls} bulls, {Cows} cows", result.Bulls, result.Cows);
             }
             catch (Exception ex)
             {
-                GameMessage = $"Error sending guess: {ex.Message}";
-                _logger.LogError(ex, "Error sending guess");
+                GameMessage = $"Error processing guess: {ex.Message}";
+                _logger.LogError(ex, "Error processing guess");
             }
         }
 
