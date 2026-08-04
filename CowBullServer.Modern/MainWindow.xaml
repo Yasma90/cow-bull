@@ -1,58 +1,54 @@
 <Window x:Class="CowBullServer.Modern.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="CowBull Server (Modern)" Height="500" Width="700"
+        Title="CowBull Server"
+        Width="760"
+        Height="540"
+        MinWidth="620"
+        MinHeight="420"
         WindowStartupLocation="CenterScreen">
-    
-    <Grid Margin="10">
+    <Grid Margin="24">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        
-        <!-- Title -->
-        <TextBlock Grid.Row="0" Text="CowBull Server - Modern Architecture" 
-                   FontSize="20" FontWeight="Bold" 
-                   HorizontalAlignment="Center" Margin="0,0,0,20"/>
-        
-        <!-- Server Status -->
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,10">
-            <TextBlock Text="Status: " FontWeight="Bold"/>
-            <TextBlock Text="{Binding ServerStatus}" Margin="5,0"/>
-            <TextBlock Text="| Connected Clients: " FontWeight="Bold" Margin="20,0,0,0"/>
-            <TextBlock Text="{Binding ConnectedClients}" Margin="5,0"/>
+
+        <DockPanel Grid.Row="0" Margin="0,0,0,20">
+            <TextBlock DockPanel.Dock="Left"
+                       Text="CowBull authoritative server"
+                       FontSize="24"
+                       FontWeight="SemiBold"/>
+            <TextBlock DockPanel.Dock="Right"
+                       Text="{Binding ServerStatus}"
+                       VerticalAlignment="Center"/>
+        </DockPanel>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,16">
+            <Button Content="Start server"
+                    Command="{Binding StartCommand}"
+                    MinWidth="110"
+                    Padding="12,6"
+                    Margin="0,0,8,0"/>
+            <Button Content="Stop server"
+                    Command="{Binding StopCommand}"
+                    MinWidth="110"
+                    Padding="12,6"/>
         </StackPanel>
-        
-        <!-- Control Buttons -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,10">
-            <Button Content="Start Server" Command="{Binding StartServerCommand}" 
-                    Width="100" Height="30" Margin="0,0,10,0"/>
-            <Button Content="Stop Server" Command="{Binding StopServerCommand}" 
-                    Width="100" Height="30"/>
-        </StackPanel>
-        
-        <!-- Log Messages -->
-        <GroupBox Grid.Row="3" Header="Server Log" Margin="0,10,0,10">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <TextBlock Text="{Binding LogMessages}" 
-                           FontFamily="Consolas" FontSize="12" 
-                           Background="Black" Foreground="LightGreen"
-                           Padding="5"/>
-            </ScrollViewer>
+
+        <GroupBox Grid.Row="2" Header="Activity">
+            <ListBox ItemsSource="{Binding Activity}"
+                     FontFamily="Consolas"
+                     ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
         </GroupBox>
-        
-        <!-- Status Bar -->
-        <StatusBar Grid.Row="4">
-            <StatusBarItem>
-                <TextBlock>
-                    <Run Text="Ready"/>
-                    <Run Text=" | Running: "/>
-                    <Run Text="{Binding IsServerRunning}"/>
-                </TextBlock>
-            </StatusBarItem>
-        </StatusBar>
+
+        <DockPanel Grid.Row="3" Margin="0,16,0,0">
+            <TextBlock DockPanel.Dock="Left"
+                       Text="{Binding Endpoint, StringFormat='Endpoint: {0}'}"/>
+            <TextBlock DockPanel.Dock="Right"
+                       Text="{Binding ConnectedClients, StringFormat='Connected clients: {0}'}"
+                       FontWeight="SemiBold"/>
+        </DockPanel>
     </Grid>
 </Window>
