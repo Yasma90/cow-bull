@@ -17,6 +17,7 @@ public sealed class ProtocolSerializerTests
             new GuessResponse(Guid.NewGuid(), sessionId, "1234", 1, 2, 3, false, false),
             new SurrenderRequest(Guid.NewGuid(), sessionId),
             new GameEndedResponse(Guid.NewGuid(), sessionId, GameEndReason.Surrendered, "9876", 3),
+            new GameEndedResponse(Guid.NewGuid(), sessionId, GameEndReason.TimedOut, "9876", 3),
             new ErrorResponse(Guid.NewGuid(), sessionId, "invalidGuess", "The guess is invalid."),
         };
 

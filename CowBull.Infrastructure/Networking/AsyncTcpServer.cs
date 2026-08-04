@@ -18,12 +18,10 @@ public sealed partial class AsyncTcpServer : IAsyncDisposable
     private readonly ConcurrentDictionary<Guid, ClientConnection> _clients = new();
     private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
     private readonly object _serverSync = new();
-    private readonly object _notificationSync = new();
 
     private TcpListener? _listener;
     private CancellationTokenSource? _serverCancellation;
     private Task? _acceptTask;
-    private Task _notificationTail = Task.CompletedTask;
     private int _isListening;
     private int _disposeStarted;
 
@@ -36,10 +34,22 @@ public sealed partial class AsyncTcpServer : IAsyncDisposable
         _logger = logger ?? NullLogger<AsyncTcpServer>.Instance;
     }
 
+    /// <summary>
+    /// Raised synchronously on the accept loop before receiving starts for that client.
+    /// Handlers must return promptly. Handler exceptions are isolated from the transport.
+    /// </summary>
     public event EventHandler<ClientConnectedEventArgs>? ClientConnected;
 
+    /// <summary>
+    /// Raised synchronously on the client receive loop. Handlers must return promptly.
+    /// Handler exceptions are isolated from the transport.
+    /// </summary>
     public event EventHandler<ClientDisconnectedEventArgs>? ClientDisconnected;
 
+    /// <summary>
+    /// Raised synchronously on the client receive loop. Handlers must return promptly.
+    /// Handler exceptions are isolated from the transport.
+    /// </summary>
     public event EventHandler<ClientMessageReceivedEventArgs>? MessageReceived;
 
     public bool IsListening => Volatile.Read(ref _isListening) != 0;
@@ -125,8 +135,13 @@ public sealed partial class AsyncTcpServer : IAsyncDisposable
             await connection.SendAsync(message, cancellationToken).ConfigureAwait(false);
             return true;
         }
+        catch (TimeoutException exception)
+        {
+            LogSendFailure(clientId, exception);
+            return false;
+        }
         catch (Exception exception)
-            when (exception is IOException or SocketException or TimeoutException or ObjectDisposedException)
+            when (exception is IOException or SocketException or ObjectDisposedException)
         {
             connection.Abort("The client connection failed while sending.");
             LogSendFailure(clientId, exception);
@@ -243,9 +258,9 @@ public sealed partial class AsyncTcpServer : IAsyncDisposable
                     continue;
                 }
 
-                connection.ReceiveTask = HandleClientAsync(connection);
                 var eventArgs = new ClientConnectedEventArgs(connection.Id, connection.RemoteEndpoint);
-                EnqueueNotification(() => ClientConnected?.Invoke(this, eventArgs));
+                InvokeEventHandler(ClientConnected, eventArgs);
+                connection.ReceiveTask = HandleClientAsync(connection);
             }
         }
         catch (OperationCanceledException) when (serverCancellation.IsCancellationRequested)
@@ -287,7 +302,7 @@ public sealed partial class AsyncTcpServer : IAsyncDisposable
                 }
 
                 var eventArgs = new ClientMessageReceivedEventArgs(connection.Id, message);
-                EnqueueNotification(() => MessageReceived?.Invoke(this, eventArgs));
+                InvokeEventHandler(MessageReceived, eventArgs);
             }
         }
         catch (OperationCanceledException) when (connection.CancellationToken.IsCancellationRequested)
@@ -310,7 +325,7 @@ public sealed partial class AsyncTcpServer : IAsyncDisposable
                     connection.Id,
                     connection.CloseReason,
                     disconnectException);
-                EnqueueNotification(() => ClientDisconnected?.Invoke(this, eventArgs));
+                InvokeEventHandler(ClientDisconnected, eventArgs);
             }
 
             await connection.DisposeAsync().ConfigureAwait(false);
@@ -326,8 +341,12 @@ public sealed partial class AsyncTcpServer : IAsyncDisposable
         {
             await connection.SendAsync(message, cancellationToken).ConfigureAwait(false);
         }
+        catch (TimeoutException exception)
+        {
+            LogSendFailure(connection.Id, exception);
+        }
         catch (Exception exception)
-            when (exception is IOException or SocketException or TimeoutException or ObjectDisposedException)
+            when (exception is IOException or SocketException or ObjectDisposedException)
         {
             connection.Abort("The client connection failed while broadcasting.");
             LogSendFailure(connection.Id, exception);
@@ -374,27 +393,26 @@ public sealed partial class AsyncTcpServer : IAsyncDisposable
         _clients.Clear();
     }
 
-    private void EnqueueNotification(Action notification)
+    private void InvokeEventHandler<TEventArgs>(
+        EventHandler<TEventArgs>? eventHandler,
+        TEventArgs eventArgs)
+        where TEventArgs : EventArgs
     {
-        lock (_notificationSync)
+        if (eventHandler is null)
         {
-            _notificationTail = _notificationTail.ContinueWith(
-                _ => InvokeNotification(notification),
-                CancellationToken.None,
-                TaskContinuationOptions.DenyChildAttach,
-                TaskScheduler.Default);
+            return;
         }
-    }
 
-    private void InvokeNotification(Action notification)
-    {
-        try
+        foreach (Delegate subscriber in eventHandler.GetInvocationList())
         {
-            notification();
-        }
-        catch (Exception exception)
-        {
-            LogEventHandlerFailure(exception);
+            try
+            {
+                ((EventHandler<TEventArgs>)subscriber).Invoke(this, eventArgs);
+            }
+            catch (Exception exception)
+            {
+                LogEventHandlerFailure(exception);
+            }
         }
     }
 
@@ -527,7 +545,31 @@ public sealed partial class AsyncTcpServer : IAsyncDisposable
                       !cancellationToken.IsCancellationRequested &&
                       !_connectionCancellation.IsCancellationRequested)
             {
+                if (enteredWriteGate)
+                {
+                    Abort("The framed write timed out.");
+                }
+
                 throw new TimeoutException("Sending the client message timed out.", exception);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                if (enteredWriteGate)
+                {
+                    Abort("The framed write was cancelled by its caller.");
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                throw;
+            }
+            catch (OperationCanceledException)
+            {
+                if (enteredWriteGate)
+                {
+                    Abort("The framed write was cancelled.");
+                }
+
+                throw;
             }
             finally
             {

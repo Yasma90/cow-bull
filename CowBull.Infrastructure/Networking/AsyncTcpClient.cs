@@ -16,13 +16,11 @@ public sealed partial class AsyncTcpClient : IAsyncDisposable
     private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
     private readonly SemaphoreSlim _writeGate = new(1, 1);
     private readonly object _connectionSync = new();
-    private readonly object _notificationSync = new();
 
     private TcpClient? _tcpClient;
     private NetworkStream? _stream;
     private CancellationTokenSource? _connectionCancellation;
     private Task? _receiveTask;
-    private Task _notificationTail = Task.CompletedTask;
     private int _state = (int)TcpConnectionState.Disconnected;
     private int _disposeStarted;
 
@@ -35,8 +33,16 @@ public sealed partial class AsyncTcpClient : IAsyncDisposable
         _logger = logger ?? NullLogger<AsyncTcpClient>.Instance;
     }
 
+    /// <summary>
+    /// Raised synchronously on the receive loop. Handlers must return promptly.
+    /// Handler exceptions are isolated from the transport.
+    /// </summary>
     public event EventHandler<NetworkMessageReceivedEventArgs>? MessageReceived;
 
+    /// <summary>
+    /// Raised synchronously by the operation that changes state. Handlers must return promptly.
+    /// Handler exceptions are isolated from the transport.
+    /// </summary>
     public event EventHandler<ConnectionStateChangedEventArgs>? ConnectionStateChanged;
 
     public TcpConnectionState State => (TcpConnectionState)Volatile.Read(ref _state);
@@ -189,7 +195,31 @@ public sealed partial class AsyncTcpClient : IAsyncDisposable
                   !cancellationToken.IsCancellationRequested &&
                   !connectionToken.IsCancellationRequested)
         {
+            if (enteredWriteGate)
+            {
+                AbortConnection();
+            }
+
             throw new TimeoutException("Sending the message timed out.", exception);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            if (enteredWriteGate)
+            {
+                AbortConnection();
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            throw;
+        }
+        catch (OperationCanceledException)
+        {
+            if (enteredWriteGate)
+            {
+                AbortConnection();
+            }
+
+            throw;
         }
         catch (Exception exception) when (exception is IOException or SocketException)
         {
@@ -294,7 +324,7 @@ public sealed partial class AsyncTcpClient : IAsyncDisposable
                     break;
                 }
 
-                EnqueueNotification(() => MessageReceived?.Invoke(this, new NetworkMessageReceivedEventArgs(message)));
+                InvokeEventHandler(MessageReceived, new NetworkMessageReceivedEventArgs(message));
             }
         }
         catch (OperationCanceledException) when (connectionCancellation.IsCancellationRequested)
@@ -377,30 +407,29 @@ public sealed partial class AsyncTcpClient : IAsyncDisposable
         }
 
         var eventArgs = new ConnectionStateChangedEventArgs(previousState, newState, reason, exception);
-        EnqueueNotification(() => ConnectionStateChanged?.Invoke(this, eventArgs));
+        InvokeEventHandler(ConnectionStateChanged, eventArgs);
     }
 
-    private void EnqueueNotification(Action notification)
+    private void InvokeEventHandler<TEventArgs>(
+        EventHandler<TEventArgs>? eventHandler,
+        TEventArgs eventArgs)
+        where TEventArgs : EventArgs
     {
-        lock (_notificationSync)
+        if (eventHandler is null)
         {
-            _notificationTail = _notificationTail.ContinueWith(
-                _ => InvokeNotification(notification),
-                CancellationToken.None,
-                TaskContinuationOptions.DenyChildAttach,
-                TaskScheduler.Default);
+            return;
         }
-    }
 
-    private void InvokeNotification(Action notification)
-    {
-        try
+        foreach (Delegate subscriber in eventHandler.GetInvocationList())
         {
-            notification();
-        }
-        catch (Exception exception)
-        {
-            LogEventHandlerFailure(exception);
+            try
+            {
+                ((EventHandler<TEventArgs>)subscriber).Invoke(this, eventArgs);
+            }
+            catch (Exception exception)
+            {
+                LogEventHandlerFailure(exception);
+            }
         }
     }
 

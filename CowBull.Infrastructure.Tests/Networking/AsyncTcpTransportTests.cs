@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Net;
+using System.Net.Sockets;
 using CowBull.Infrastructure.Networking;
 
 namespace CowBull.Infrastructure.Tests.Networking;
@@ -150,5 +151,113 @@ public sealed class AsyncTcpTransportTests
 
         await client.DisconnectAsync();
         await server.StopAsync();
+    }
+
+    [Fact]
+    public async Task ClientEvents_AreDeliveredInConnectedMessageDisconnectedOrder()
+    {
+        var serverConfiguration = new NetworkConfiguration(
+            IPAddress.Loopback.ToString(),
+            port: 0,
+            readTimeout: TimeSpan.FromSeconds(10));
+        await using var server = new AsyncTcpServer(serverConfiguration);
+        var eventOrder = new ConcurrentQueue<string>();
+        var messageReceived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var disconnected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        server.ClientConnected += (_, _) => eventOrder.Enqueue("connected");
+        server.MessageReceived += (_, _) =>
+        {
+            eventOrder.Enqueue("message");
+            messageReceived.TrySetResult();
+        };
+        server.ClientDisconnected += (_, _) =>
+        {
+            eventOrder.Enqueue("disconnected");
+            disconnected.TrySetResult();
+        };
+
+        await server.StartAsync();
+        int port = Assert.IsType<IPEndPoint>(server.LocalEndpoint).Port;
+        await using var client = new AsyncTcpClient(
+            new NetworkConfiguration(
+                IPAddress.Loopback.ToString(),
+                port,
+                readTimeout: TimeSpan.FromSeconds(10)));
+
+        await client.ConnectAsync();
+        await client.SendAsync("sent-immediately#雪");
+        await messageReceived.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await client.DisconnectAsync();
+        await disconnected.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        string[] observedOrder = eventOrder.ToArray();
+        Assert.Equal(3, observedOrder.Length);
+        Assert.Equal("connected", observedOrder[0]);
+        Assert.Equal("message", observedOrder[1]);
+        Assert.Equal("disconnected", observedOrder[2]);
+
+        await server.StopAsync();
+    }
+
+    [Fact]
+    public async Task ClientSend_CancelledAfterWriteAdmission_AbortsConnectionAndPreservesCallerToken()
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Server.ReceiveBufferSize = 1_024;
+        listener.Start();
+
+        try
+        {
+            int port = Assert.IsType<IPEndPoint>(listener.LocalEndpoint).Port;
+            Task<TcpClient> acceptTask = listener.AcceptTcpClientAsync();
+            await using var client = new AsyncTcpClient(
+                new NetworkConfiguration(
+                    IPAddress.Loopback.ToString(),
+                    port,
+                    maximumPayloadBytes: NetworkConfiguration.MaximumSupportedPayloadBytes,
+                    readTimeout: TimeSpan.FromSeconds(30),
+                    writeTimeout: TimeSpan.FromSeconds(30)));
+            var disconnected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            client.ConnectionStateChanged += (_, eventArgs) =>
+            {
+                if (eventArgs.CurrentState == TcpConnectionState.Disconnected)
+                {
+                    disconnected.TrySetResult();
+                }
+            };
+
+            await client.ConnectAsync();
+            using TcpClient peer = await acceptTask.WaitAsync(TimeSpan.FromSeconds(5));
+            peer.ReceiveBufferSize = 1_024;
+
+            using var cancellation = new CancellationTokenSource();
+            string payload = new('x', NetworkConfiguration.MaximumSupportedPayloadBytes);
+            Task sendTask = SendContinuouslyAsync(client, payload, cancellation.Token);
+            await Task.Delay(TimeSpan.FromMilliseconds(500));
+            cancellation.Cancel();
+
+            OperationCanceledException exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => sendTask);
+            await disconnected.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            Assert.Equal(cancellation.Token, exception.CancellationToken);
+            Assert.False(client.IsConnected);
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
+    private static async Task SendContinuouslyAsync(
+        AsyncTcpClient client,
+        string payload,
+        CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            await client.SendAsync(payload, cancellationToken);
+        }
     }
 }

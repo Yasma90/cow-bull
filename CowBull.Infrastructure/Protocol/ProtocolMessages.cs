@@ -239,6 +239,7 @@ public enum GameEndReason
     Won,
     AttemptsExhausted,
     Surrendered,
+    TimedOut,
 }
 
 internal static class ProtocolValidation
