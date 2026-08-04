@@ -1,0 +1,2 @@
+# Keep text identical across Windows developer machines and CI runners.
+* text=auto eol=lf
