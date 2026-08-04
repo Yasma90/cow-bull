@@ -6,7 +6,7 @@ namespace CowBull.Domain.Games;
 /// An immutable public representation of a game. The secret is deliberately
 /// omitted until the game reaches a terminal state.
 /// </summary>
-public sealed record GameSnapshot
+public sealed class GameSnapshot
 {
     private readonly ReadOnlyCollection<GameAttempt> _attempts;
 

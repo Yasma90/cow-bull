@@ -95,7 +95,7 @@ public sealed class GameSessionTests
         var second = game.Abandon(StartedAt.AddSeconds(2));
 
         Assert.Equal(GameStatus.Abandoned, first.Status);
-        Assert.Equal(first, second);
+        AssertEquivalent(first, second);
         Assert.Equal("0123", second.SecretNumber);
     }
 
@@ -135,4 +135,22 @@ public sealed class GameSessionTests
         TimeSpan? timeout = null,
         bool allowDuplicateDigits = false) =>
         new(4, maxAttempts, allowDuplicateDigits, timeout ?? TimeSpan.FromMinutes(1));
+
+    private static void AssertEquivalent(GameSnapshot expected, GameSnapshot actual)
+    {
+        Assert.Equal(expected.GameId, actual.GameId);
+        Assert.Equal(expected.Configuration, actual.Configuration);
+        Assert.Equal(expected.Status, actual.Status);
+        Assert.Equal(expected.StartedAt, actual.StartedAt);
+        Assert.Equal(expected.EndedAt, actual.EndedAt);
+        Assert.Equal(expected.SecretNumber, actual.SecretNumber);
+        Assert.Equal(expected.RemainingAttempts, actual.RemainingAttempts);
+        Assert.Equal(expected.IsTerminal, actual.IsTerminal);
+        Assert.Equal(expected.Attempts.Count, actual.Attempts.Count);
+
+        for (var index = 0; index < expected.Attempts.Count; index++)
+        {
+            Assert.Equal(expected.Attempts[index], actual.Attempts[index]);
+        }
+    }
 }
