@@ -9,4 +9,6 @@ public interface IGameRepository
     void Add(GameSession game);
 
     void Update(GameSession game);
+
+    bool Remove(Guid gameId);
 }

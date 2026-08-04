@@ -44,8 +44,20 @@ public sealed class GameService : IGameService
     public GuessResult SubmitGuess(Guid gameId, string guess)
     {
         var game = GetRequiredGame(gameId);
-        var result = game.SubmitGuess(guess, _timeProvider.GetUtcNow());
-        _repository.Update(game);
+        DateTimeOffset now = _timeProvider.GetUtcNow();
+        GuessResult result;
+        try
+        {
+            result = game.SubmitGuess(guess, now);
+        }
+        catch (InvalidOperationException exception) when (game.Status != GameStatus.Active)
+        {
+            GameSnapshot terminalGame = game.GetSnapshot(now);
+            _repository.Remove(game.GameId);
+            throw new GameInactiveException(terminalGame, exception);
+        }
+
+        Persist(game, result.Game);
         return result;
     }
 
@@ -54,9 +66,7 @@ public sealed class GameService : IGameService
         var game = GetRequiredGame(gameId);
         var snapshot = game.GetSnapshot(_timeProvider.GetUtcNow());
 
-        // Reading may apply the timeout transition, so it is persisted as an
-        // update just like command-driven transitions.
-        _repository.Update(game);
+        Persist(game, snapshot);
         return snapshot;
     }
 
@@ -64,8 +74,20 @@ public sealed class GameService : IGameService
     {
         var game = GetRequiredGame(gameId);
         var snapshot = game.Abandon(_timeProvider.GetUtcNow());
-        _repository.Update(game);
+        _repository.Remove(game.GameId);
         return snapshot;
+    }
+
+    private void Persist(GameSession game, GameSnapshot snapshot)
+    {
+        if (snapshot.IsTerminal)
+        {
+            _repository.Remove(game.GameId);
+        }
+        else
+        {
+            _repository.Update(game);
+        }
     }
 
     private GameSession GetRequiredGame(Guid gameId)

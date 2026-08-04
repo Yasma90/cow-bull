@@ -130,6 +130,8 @@ public sealed class GameRequestHandlerTests
     {
         var context = CreateContext();
         StartGame(context);
+        GameSession aggregate = Assert.IsType<GameSession>(
+            context.Repository.GetById(SessionId));
 
         context.Handler.Disconnect(ClientId);
 
@@ -138,6 +140,24 @@ public sealed class GameRequestHandlerTests
                 ClientId,
                 new GuessRequest(Guid.NewGuid(), SessionId, "0123")));
         Assert.Equal("sessionNotOwned", Assert.IsType<ErrorResponse>(response).Code);
+        Assert.Equal(GameStatus.Abandoned, aggregate.GetSnapshot(Now).Status);
+        Assert.Equal(0, context.Repository.Count);
+    }
+
+    [Fact]
+    public void Replacing_games_retains_only_the_current_active_session()
+    {
+        var context = CreateContext();
+
+        for (var index = 0; index < 100; index++)
+        {
+            StartGame(context);
+            Assert.Equal(1, context.Repository.Count);
+        }
+
+        context.Handler.Disconnect(ClientId);
+
+        Assert.Equal(0, context.Repository.Count);
     }
 
     private static void StartGame(TestContext context) =>
@@ -148,18 +168,24 @@ public sealed class GameRequestHandlerTests
     private static TestContext CreateContext()
     {
         var clock = new ManualTimeProvider(Now);
+        var repository = new InMemoryGameRepository();
         var service = new GameService(
-            new InMemoryGameRepository(),
+            repository,
             new StubSecretNumberGenerator("0123"),
             new StubGameIdGenerator(SessionId),
             clock);
 
-        return new TestContext(new GameRequestHandler(service), service, clock);
+        return new TestContext(
+            new GameRequestHandler(service),
+            service,
+            repository,
+            clock);
     }
 
     private sealed record TestContext(
         GameRequestHandler Handler,
         GameService Service,
+        InMemoryGameRepository Repository,
         ManualTimeProvider Clock);
 
     private sealed class StubSecretNumberGenerator(string secret) : ISecretNumberGenerator

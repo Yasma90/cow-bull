@@ -26,7 +26,7 @@ public sealed class GameServiceTests
     }
 
     [Fact]
-    public void SubmitGuess_updates_persisted_game_and_returns_result()
+    public void SubmitGuess_removes_terminal_game_and_returns_result()
     {
         var context = CreateContext();
         context.Service.StartGame(Configuration());
@@ -36,7 +36,23 @@ public sealed class GameServiceTests
 
         Assert.Equal(GameStatus.Won, result.Game.Status);
         Assert.Equal(4, result.Attempt.Score.Bulls);
+        Assert.Equal(0, context.Repository.UpdateCount);
+        Assert.Equal(1, context.Repository.RemoveCount);
+        Assert.Null(context.Repository.GetById(GameId));
+    }
+
+    [Fact]
+    public void SubmitGuess_updates_game_while_it_remains_active()
+    {
+        var context = CreateContext();
+        context.Service.StartGame(Configuration());
+        context.Clock.SetUtcNow(StartedAt.AddSeconds(1));
+
+        GuessResult result = context.Service.SubmitGuess(GameId, "4567");
+
+        Assert.Equal(GameStatus.Active, result.Game.Status);
         Assert.Equal(1, context.Repository.UpdateCount);
+        Assert.Equal(0, context.Repository.RemoveCount);
     }
 
     [Fact]
@@ -50,7 +66,9 @@ public sealed class GameServiceTests
 
         Assert.Equal(GameStatus.TimedOut, snapshot.Status);
         Assert.Equal("0123", snapshot.SecretNumber);
-        Assert.Equal(1, context.Repository.UpdateCount);
+        Assert.Equal(0, context.Repository.UpdateCount);
+        Assert.Equal(1, context.Repository.RemoveCount);
+        Assert.Null(context.Repository.GetById(GameId));
     }
 
     [Fact]
@@ -64,7 +82,25 @@ public sealed class GameServiceTests
 
         Assert.Equal(GameStatus.Abandoned, snapshot.Status);
         Assert.Equal("0123", snapshot.SecretNumber);
-        Assert.Equal(1, context.Repository.UpdateCount);
+        Assert.Equal(0, context.Repository.UpdateCount);
+        Assert.Equal(1, context.Repository.RemoveCount);
+        Assert.Null(context.Repository.GetById(GameId));
+    }
+
+    [Fact]
+    public void SubmitGuess_at_timeout_returns_typed_terminal_snapshot_and_removes_game()
+    {
+        var context = CreateContext();
+        context.Service.StartGame(Configuration(timeout: TimeSpan.FromSeconds(10)));
+        context.Clock.SetUtcNow(StartedAt.AddSeconds(10));
+
+        GameInactiveException exception = Assert.Throws<GameInactiveException>(
+            () => context.Service.SubmitGuess(GameId, "0123"));
+
+        Assert.Equal(GameStatus.TimedOut, exception.Game.Status);
+        Assert.Equal("0123", exception.Game.SecretNumber);
+        Assert.Equal(1, context.Repository.RemoveCount);
+        Assert.Null(context.Repository.GetById(GameId));
     }
 
     [Fact]
@@ -121,6 +157,8 @@ public sealed class GameServiceTests
 
         public int UpdateCount { get; private set; }
 
+        public int RemoveCount { get; private set; }
+
         public GameSession? GetById(Guid gameId) => _games.GetValueOrDefault(gameId);
 
         public void Add(GameSession game)
@@ -133,6 +171,12 @@ public sealed class GameServiceTests
         {
             _games[game.GameId] = game;
             UpdateCount++;
+        }
+
+        public bool Remove(Guid gameId)
+        {
+            RemoveCount++;
+            return _games.Remove(gameId);
         }
     }
 

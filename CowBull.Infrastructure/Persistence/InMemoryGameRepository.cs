@@ -13,6 +13,8 @@ public sealed class InMemoryGameRepository : IGameRepository
 {
     private readonly ConcurrentDictionary<Guid, GameSession> _games = new();
 
+    public int Count => _games.Count;
+
     public GameSession? GetById(Guid gameId) =>
         _games.GetValueOrDefault(gameId);
 
@@ -40,4 +42,7 @@ public sealed class InMemoryGameRepository : IGameRepository
             throw new InvalidOperationException($"Game '{game.GameId}' was changed concurrently.");
         }
     }
+
+    public bool Remove(Guid gameId) =>
+        _games.TryRemove(gameId, out _);
 }

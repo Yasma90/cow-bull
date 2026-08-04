@@ -47,6 +47,11 @@ public sealed class GameRequestHandler
                     "Clients may send request messages only.")
             };
         }
+        catch (GameInactiveException exception)
+        {
+            _sessionsByClient.TryRemove(clientId, out _);
+            return [CreateEndedResponse(request.MessageId, exception.Game)];
+        }
         catch (GameNotFoundException exception)
         {
             _sessionsByClient.TryRemove(clientId, out _);
@@ -58,7 +63,11 @@ public sealed class GameRequestHandler
         }
         catch (InvalidOperationException exception)
         {
-            return HandleInactiveGame(clientId, request, exception);
+            return Error(
+                request.MessageId,
+                SessionId(request),
+                "gameNotActive",
+                exception.Message);
         }
     }
 
@@ -157,29 +166,6 @@ public sealed class GameRequestHandler
         GameSnapshot game = _gameService.EndGame(request.SessionId);
         _sessionsByClient.TryRemove(clientId, out _);
         return [CreateEndedResponse(request.MessageId, game)];
-    }
-
-    private IReadOnlyList<ProtocolMessage> HandleInactiveGame(
-        Guid clientId,
-        ProtocolMessage request,
-        InvalidOperationException exception)
-    {
-        Guid? sessionId = SessionId(request);
-        if (sessionId is Guid id && OwnsSession(clientId, id))
-        {
-            GameSnapshot game = _gameService.GetGame(id);
-            if (game.Status == GameStatus.TimedOut)
-            {
-                _sessionsByClient.TryRemove(clientId, out _);
-                return [CreateEndedResponse(request.MessageId, game)];
-            }
-        }
-
-        return Error(
-            request.MessageId,
-            sessionId,
-            "gameNotActive",
-            exception.Message);
     }
 
     private bool OwnsSession(Guid clientId, Guid sessionId) =>
