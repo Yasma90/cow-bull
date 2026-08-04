@@ -250,6 +250,59 @@ public sealed class AsyncTcpTransportTests
         }
     }
 
+    [Fact]
+    public async Task StateNotifications_ReentrantDisconnectRacingRemoteClose_RemainInTransitionOrder()
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+
+        try
+        {
+            int port = Assert.IsType<IPEndPoint>(listener.LocalEndpoint).Port;
+            Task<TcpClient> acceptTask = listener.AcceptTcpClientAsync();
+            var connected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var observedStates = new ConcurrentQueue<TcpConnectionState>();
+            Task? localDisconnect = null;
+
+            await using var client = new AsyncTcpClient(
+                new NetworkConfiguration(
+                    IPAddress.Loopback.ToString(),
+                    port,
+                    readTimeout: TimeSpan.FromSeconds(10)));
+            client.ConnectionStateChanged += (_, eventArgs) =>
+            {
+                observedStates.Enqueue(eventArgs.CurrentState);
+                if (eventArgs.CurrentState == TcpConnectionState.Connected)
+                {
+                    connected.TrySetResult();
+                    localDisconnect = client.DisconnectAsync();
+                }
+            };
+
+            Task remoteClose = Task.Run(async () =>
+            {
+                using TcpClient peer = await acceptTask;
+                await connected.Task;
+            });
+
+            await client.ConnectAsync();
+            Assert.NotNull(localDisconnect);
+            await localDisconnect.WaitAsync(TimeSpan.FromSeconds(5));
+            await remoteClose.WaitAsync(TimeSpan.FromSeconds(5));
+
+            TcpConnectionState[] states = observedStates.ToArray();
+            Assert.Equal(4, states.Length);
+            Assert.Equal(TcpConnectionState.Connecting, states[0]);
+            Assert.Equal(TcpConnectionState.Connected, states[1]);
+            Assert.Equal(TcpConnectionState.Disconnecting, states[2]);
+            Assert.Equal(TcpConnectionState.Disconnected, states[3]);
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
     private static async Task SendContinuouslyAsync(
         AsyncTcpClient client,
         string payload,

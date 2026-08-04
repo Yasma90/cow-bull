@@ -16,12 +16,15 @@ public sealed partial class AsyncTcpClient : IAsyncDisposable
     private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
     private readonly SemaphoreSlim _writeGate = new(1, 1);
     private readonly object _connectionSync = new();
+    private readonly object _stateSync = new();
+    private readonly Queue<ConnectionStateChangedEventArgs> _pendingStateNotifications = new();
 
     private TcpClient? _tcpClient;
     private NetworkStream? _stream;
     private CancellationTokenSource? _connectionCancellation;
     private Task? _receiveTask;
     private int _state = (int)TcpConnectionState.Disconnected;
+    private bool _isDrainingStateNotifications;
     private int _disposeStarted;
 
     public AsyncTcpClient(
@@ -400,14 +403,49 @@ public sealed partial class AsyncTcpClient : IAsyncDisposable
 
     private void ChangeState(TcpConnectionState newState, string reason, Exception? exception = null)
     {
-        var previousState = (TcpConnectionState)Interlocked.Exchange(ref _state, (int)newState);
-        if (previousState == newState)
+        bool shouldDrain;
+        lock (_stateSync)
         {
-            return;
+            var previousState = (TcpConnectionState)_state;
+            if (previousState == newState)
+            {
+                return;
+            }
+
+            Volatile.Write(ref _state, (int)newState);
+            _pendingStateNotifications.Enqueue(
+                new ConnectionStateChangedEventArgs(previousState, newState, reason, exception));
+            shouldDrain = !_isDrainingStateNotifications;
+            if (shouldDrain)
+            {
+                _isDrainingStateNotifications = true;
+            }
         }
 
-        var eventArgs = new ConnectionStateChangedEventArgs(previousState, newState, reason, exception);
-        InvokeEventHandler(ConnectionStateChanged, eventArgs);
+        if (shouldDrain)
+        {
+            DrainStateNotifications();
+        }
+    }
+
+    private void DrainStateNotifications()
+    {
+        while (true)
+        {
+            ConnectionStateChangedEventArgs eventArgs;
+            lock (_stateSync)
+            {
+                if (_pendingStateNotifications.Count == 0)
+                {
+                    _isDrainingStateNotifications = false;
+                    return;
+                }
+
+                eventArgs = _pendingStateNotifications.Dequeue();
+            }
+
+            InvokeEventHandler(ConnectionStateChanged, eventArgs);
+        }
     }
 
     private void InvokeEventHandler<TEventArgs>(
