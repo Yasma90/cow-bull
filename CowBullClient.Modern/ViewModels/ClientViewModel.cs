@@ -200,7 +200,6 @@ public sealed partial class ClientViewModel : ObservableObject, IAsyncDisposable
                 {
                     if (IsExpectedResponse(messageId))
                     {
-                        CompleteRequest();
                         IsBusy = false;
                         if (IsGameActive)
                         {
@@ -211,6 +210,8 @@ public sealed partial class ClientViewModel : ObservableObject, IAsyncDisposable
                         {
                             StatusMessage = "The server response timed out. Try again.";
                         }
+
+                        CompleteRequest();
                     }
                 });
         }
