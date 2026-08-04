@@ -1,0 +1,6 @@
+<Project>
+  <!-- Descriptive xUnit names intentionally use underscores. Keep the public API rule enabled elsewhere. -->
+  <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+  </PropertyGroup>
+</Project>
