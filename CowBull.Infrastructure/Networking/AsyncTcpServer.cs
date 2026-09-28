@@ -52,6 +52,11 @@ public sealed partial class AsyncTcpServer : IAsyncDisposable
     /// </summary>
     public event EventHandler<ClientMessageReceivedEventArgs>? MessageReceived;
 
+    /// <summary>
+    /// Raised when the accept loop stops because of an unexpected failure.
+    /// </summary>
+    public event EventHandler<ListeningFailedEventArgs>? ListeningFailed;
+
     public bool IsListening => Volatile.Read(ref _isListening) != 0;
 
     public int ConnectedClientCount => _clients.Count;
@@ -178,8 +183,22 @@ public sealed partial class AsyncTcpServer : IAsyncDisposable
             return;
         }
 
-        await StopCoreAsync(CancellationToken.None).ConfigureAwait(false);
-        GC.SuppressFinalize(this);
+        try
+        {
+            await StopCoreAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+        finally
+        {
+            await DrainGateAsync(_lifecycleGate).ConfigureAwait(false);
+            GC.SuppressFinalize(this);
+        }
+    }
+
+    private static async ValueTask DrainGateAsync(SemaphoreSlim gate)
+    {
+        await gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+        gate.Release();
+        gate.Dispose();
     }
 
     private async Task StopCoreAsync(CancellationToken cancellationToken)
@@ -251,16 +270,20 @@ public sealed partial class AsyncTcpServer : IAsyncDisposable
                     _configuration,
                     serverCancellation.Token);
 
+                var receiveReady = new TaskCompletionSource(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+                connection.ReceiveTask = HandleClientAsync(connection, receiveReady.Task);
                 if (!_clients.TryAdd(connection.Id, connection))
                 {
+                    receiveReady.TrySetResult();
                     connection.Abort("A duplicate client identifier was generated.");
-                    await connection.DisposeAsync().ConfigureAwait(false);
+                    await connection.ReceiveTask.ConfigureAwait(false);
                     continue;
                 }
 
                 var eventArgs = new ClientConnectedEventArgs(connection.Id, connection.RemoteEndpoint);
                 InvokeEventHandler(ClientConnected, eventArgs);
-                connection.ReceiveTask = HandleClientAsync(connection);
+                receiveReady.TrySetResult();
             }
         }
         catch (OperationCanceledException) when (serverCancellation.IsCancellationRequested)
@@ -279,6 +302,9 @@ public sealed partial class AsyncTcpServer : IAsyncDisposable
         {
             LogAcceptFailure(exception);
             RequestStop();
+            InvokeEventHandler(
+                ListeningFailed,
+                new ListeningFailedEventArgs("The accept loop stopped unexpectedly."));
         }
         finally
         {
@@ -286,13 +312,14 @@ public sealed partial class AsyncTcpServer : IAsyncDisposable
         }
     }
 
-    private async Task HandleClientAsync(ClientConnection connection)
+    private async Task HandleClientAsync(ClientConnection connection, Task receiveReady)
     {
         string disconnectReason = "The remote endpoint closed the connection.";
         Exception? disconnectException = null;
 
         try
         {
+            await receiveReady.WaitAsync(connection.CancellationToken).ConfigureAwait(false);
             while (!connection.CancellationToken.IsCancellationRequested)
             {
                 string? message = await connection.ReadAsync().ConfigureAwait(false);

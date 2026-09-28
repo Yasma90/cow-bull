@@ -15,6 +15,17 @@ public sealed class ProtocolSerializerTests
             new NewGameResponse(Guid.NewGuid(), sessionId, 4, 10),
             new GuessRequest(Guid.NewGuid(), sessionId, "1234"),
             new GuessResponse(Guid.NewGuid(), sessionId, "1234", 1, 2, 3, false, false),
+            new GuessResponse(
+                Guid.NewGuid(),
+                sessionId,
+                "1234",
+                4,
+                0,
+                1,
+                true,
+                true,
+                "9876",
+                GameEndReason.Won),
             new SurrenderRequest(Guid.NewGuid(), sessionId),
             new GameEndedResponse(Guid.NewGuid(), sessionId, GameEndReason.Surrendered, "9876", 3),
             new GameEndedResponse(Guid.NewGuid(), sessionId, GameEndReason.TimedOut, "9876", 3),
@@ -65,6 +76,43 @@ public sealed class ProtocolSerializerTests
 
         Assert.DoesNotContain("secret", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("9876", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Completed_guess_response_round_trips_the_revealed_secret()
+    {
+        var response = new GuessResponse(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "1234",
+            4,
+            0,
+            1,
+            true,
+            true,
+            "9876",
+            GameEndReason.Won);
+
+        ProtocolMessage actual = ProtocolSerializer.Deserialize(ProtocolSerializer.Serialize(response));
+
+        Assert.Equal(response, actual);
+    }
+
+    [Fact]
+    public void Active_guess_response_rejects_a_revealed_secret()
+    {
+        Assert.Throws<ArgumentException>(
+            () => new GuessResponse(
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                "1234",
+                1,
+                0,
+                1,
+                false,
+                false,
+                "9876",
+                GameEndReason.Won));
     }
 
     [Fact]

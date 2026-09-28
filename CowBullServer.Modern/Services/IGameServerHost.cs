@@ -4,6 +4,8 @@ public interface IGameServerHost : IAsyncDisposable
 {
     event EventHandler<ServerActivityEventArgs>? ActivityOccurred;
 
+    event EventHandler<ServerFaultEventArgs>? Faulted;
+
     bool IsRunning { get; }
     int ConnectedClientCount { get; }
     string Endpoint { get; }
@@ -25,4 +27,15 @@ public sealed class ServerActivityEventArgs : EventArgs
 
     public string Message { get; }
     public int ConnectedClientCount { get; }
+}
+
+public sealed class ServerFaultEventArgs : EventArgs
+{
+    public ServerFaultEventArgs(string message)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(message);
+        Message = message;
+    }
+
+    public string Message { get; }
 }

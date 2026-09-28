@@ -49,7 +49,6 @@ public sealed class GameRequestHandler
         }
         catch (GameInactiveException exception)
         {
-            _sessionsByClient.TryRemove(clientId, out _);
             return [CreateEndedResponse(request.MessageId, exception.Game)];
         }
         catch (GameNotFoundException exception)
@@ -68,6 +67,32 @@ public sealed class GameRequestHandler
                 SessionId(request),
                 "gameNotActive",
                 exception.Message);
+        }
+    }
+
+    public void ReleaseDeliveredSession(
+        Guid clientId,
+        IReadOnlyList<ProtocolMessage> responses)
+    {
+        ArgumentNullException.ThrowIfNull(responses);
+        if (!responses.Any(static response =>
+                response is GameEndedResponse or GuessResponse { IsComplete: true }))
+        {
+            return;
+        }
+
+        if (!_sessionsByClient.TryRemove(clientId, out Guid sessionId))
+        {
+            return;
+        }
+
+        try
+        {
+            _gameService.EndGame(sessionId);
+        }
+        catch (Exception exception) when (
+            exception is GameNotFoundException or InvalidOperationException)
+        {
         }
     }
 
@@ -127,26 +152,22 @@ public sealed class GameRequestHandler
         }
 
         GuessResult result = _gameService.SubmitGuess(request.SessionId, request.Guess);
-        var guessResponse = new GuessResponse(
-            request.MessageId,
-            result.Game.GameId,
-            result.Attempt.Guess,
-            result.Attempt.Score.Bulls,
-            result.Attempt.Score.Cows,
-            result.Attempt.AttemptNumber,
-            result.Game.IsTerminal,
-            result.Game.Status == GameStatus.Won);
-
-        if (!result.Game.IsTerminal)
-        {
-            return [guessResponse];
-        }
-
-        _sessionsByClient.TryRemove(clientId, out _);
+        bool won = result.Game.Status == GameStatus.Won;
         return
         [
-            guessResponse,
-            CreateEndedResponse(request.MessageId, result.Game)
+            new GuessResponse(
+                request.MessageId,
+                result.Game.GameId,
+                result.Attempt.Guess,
+                result.Attempt.Score.Bulls,
+                result.Attempt.Score.Cows,
+                result.Attempt.AttemptNumber,
+                result.Game.IsTerminal,
+                won,
+                result.Game.IsTerminal ? result.Game.SecretNumber : null,
+                result.Game.IsTerminal
+                    ? won ? GameEndReason.Won : GameEndReason.AttemptsExhausted
+                    : null)
         ];
     }
 

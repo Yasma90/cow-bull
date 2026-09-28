@@ -76,7 +76,8 @@ public sealed class GameSnapshot
 
     public IReadOnlyList<GameAttempt> Attempts => _attempts;
 
-    public int RemainingAttempts => Math.Max(0, Configuration.MaxAttempts - _attempts.Count);
+    public int RemainingAttempts =>
+        IsTerminal ? 0 : Math.Max(0, Configuration.MaxAttempts - _attempts.Count);
 
     public string? SecretNumber { get; }
 

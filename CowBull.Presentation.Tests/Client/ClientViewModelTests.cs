@@ -140,6 +140,70 @@ public sealed class ClientViewModelTests
     }
 
     [Fact]
+    public void Completed_guess_reveals_the_secret_without_a_second_message()
+    {
+        using var context = CreateActiveGameContext();
+        context.ViewModel.CurrentGuess = "0123";
+        context.ViewModel.SubmitGuessCommand.Execute(null);
+        var request = Assert.IsType<GuessRequest>(context.Client.Sent[^1]);
+
+        context.Client.RaiseMessage(
+            new GuessResponse(
+                request.MessageId,
+                SessionId,
+                "0123",
+                bulls: 4,
+                cows: 0,
+                attemptNumber: 1,
+                isComplete: true,
+                isWon: true,
+                revealedSecret: "0123",
+                endReason: GameEndReason.Won));
+
+        Assert.False(context.ViewModel.IsGameActive);
+        Assert.Contains("won", context.ViewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("0123", context.ViewModel.StatusMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Guess_send_failure_unsynchronizes_the_active_session()
+    {
+        using var context = CreateActiveGameContext();
+        context.ViewModel.CurrentGuess = "1023";
+        context.Client.SendFailure = new SocketException((int)SocketError.ConnectionReset);
+
+        context.ViewModel.SubmitGuessCommand.Execute(null);
+
+        Assert.True(context.ViewModel.SurrenderCommand.CanExecute(null));
+        context.ViewModel.CurrentGuess = "4567";
+        Assert.False(context.ViewModel.SubmitGuessCommand.CanExecute(null));
+        Assert.Contains(
+            "Surrender or disconnect",
+            context.ViewModel.StatusMessage,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DisposeAsync_completes_when_the_caller_sync_context_is_blocked()
+    {
+        var client = new FakeGameClient { YieldOnDispose = true };
+        var viewModel = new ClientViewModel(client, new ImmediateDispatcher());
+        SynchronizationContext? previous = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(new BlockingSynchronizationContext());
+        Task disposeTask;
+        try
+        {
+            disposeTask = viewModel.DisposeAsync().AsTask();
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previous);
+        }
+
+        await disposeTask.WaitAsync(TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
     public void Socket_failure_is_presented_and_releases_pending_request()
     {
         using var context = CreateConnectedContext();
@@ -259,6 +323,16 @@ public sealed class ClientViewModelTests
             ViewModel.DisposeAsync().AsTask().GetAwaiter().GetResult();
     }
 
+    private sealed class BlockingSynchronizationContext : SynchronizationContext
+    {
+        public override void Post(SendOrPostCallback callback, object? state)
+        {
+        }
+
+        public override void Send(SendOrPostCallback callback, object? state) =>
+            throw new InvalidOperationException("A blocked caller context cannot run the continuation.");
+    }
+
     private sealed class ImmediateDispatcher : IUiDispatcher
     {
         public void Post(Action action) => action();
@@ -284,6 +358,8 @@ public sealed class ClientViewModelTests
         public List<ProtocolMessage> Sent { get; } = [];
 
         public Exception? SendFailure { get; set; }
+
+        public bool YieldOnDispose { get; init; }
 
         public bool IsConnected { get; private set; }
 
@@ -312,10 +388,13 @@ public sealed class ClientViewModelTests
             return Task.CompletedTask;
         }
 
-        public ValueTask DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
             IsConnected = false;
-            return ValueTask.CompletedTask;
+            if (YieldOnDispose)
+            {
+                await Task.Delay(30).ConfigureAwait(false);
+            }
         }
 
         public void RaiseMessage(ProtocolMessage message) =>

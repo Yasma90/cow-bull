@@ -102,7 +102,7 @@ public sealed partial class ClientViewModel
             OperationCanceledException or InvalidOperationException)
         {
             CompleteRequest();
-            StatusMessage = exception.Message;
+            ReportSendFailure(exception);
         }
         finally
         {
@@ -130,12 +130,24 @@ public sealed partial class ClientViewModel
             OperationCanceledException or InvalidOperationException)
         {
             CompleteRequest();
-            StatusMessage = exception.Message;
+            ReportSendFailure(exception);
         }
         finally
         {
             IsBusy = false;
         }
+    }
+
+    private void ReportSendFailure(Exception exception)
+    {
+        if (IsGameActive)
+        {
+            MarkSessionUnsynchronized(
+                $"{exception.Message} Surrender or disconnect before continuing.");
+            return;
+        }
+
+        StatusMessage = exception.Message;
     }
 
     private bool CanSubmitGuess() =>

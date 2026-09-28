@@ -42,7 +42,7 @@ public sealed class TcpGameClient : IGameClient
 
         _transport.MessageReceived -= OnMessageReceived;
         _transport.ConnectionStateChanged -= OnConnectionStateChanged;
-        await _transport.DisposeAsync();
+        await _transport.DisposeAsync().ConfigureAwait(false);
     }
 
     private void OnMessageReceived(object? sender, NetworkMessageReceivedEventArgs eventArgs)

@@ -36,8 +36,12 @@ public partial class App : Application, IDisposable
             return;
         }
 
-        _viewModel?.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        ClientViewModel? viewModel = _viewModel;
         _viewModel = null;
+        if (viewModel is not null)
+        {
+            Task.Run(() => viewModel.DisposeAsync().AsTask()).GetAwaiter().GetResult();
+        }
         GC.SuppressFinalize(this);
     }
 }

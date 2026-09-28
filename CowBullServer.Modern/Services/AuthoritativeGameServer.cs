@@ -26,9 +26,12 @@ public sealed class AuthoritativeGameServer : IGameServerHost
         _transport.ClientConnected += OnClientConnected;
         _transport.ClientDisconnected += OnClientDisconnected;
         _transport.MessageReceived += OnMessageReceived;
+        _transport.ListeningFailed += OnListeningFailed;
     }
 
     public event EventHandler<ServerActivityEventArgs>? ActivityOccurred;
+
+    public event EventHandler<ServerFaultEventArgs>? Faulted;
 
     public bool IsRunning => _transport.IsListening;
 
@@ -39,13 +42,13 @@ public sealed class AuthoritativeGameServer : IGameServerHost
 
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
-        await _transport.StartAsync(cancellationToken);
+        await _transport.StartAsync(cancellationToken).ConfigureAwait(false);
         PublishActivity($"Server listening on {Endpoint}.");
     }
 
     public async Task StopAsync(CancellationToken cancellationToken = default)
     {
-        await _transport.StopAsync(cancellationToken);
+        await _transport.StopAsync(cancellationToken).ConfigureAwait(false);
         PublishActivity("Server stopped.");
     }
 
@@ -60,14 +63,15 @@ public sealed class AuthoritativeGameServer : IGameServerHost
         {
             // Keep handlers attached during Stop so client disconnects abandon
             // their owned sessions before transport resources disappear.
-            await StopAsync();
+            await StopAsync().ConfigureAwait(false);
         }
         finally
         {
             _transport.ClientConnected -= OnClientConnected;
             _transport.ClientDisconnected -= OnClientDisconnected;
             _transport.MessageReceived -= OnMessageReceived;
-            await _transport.DisposeAsync();
+            _transport.ListeningFailed -= OnListeningFailed;
+            await _transport.DisposeAsync().ConfigureAwait(false);
         }
     }
 
@@ -102,7 +106,9 @@ public sealed class AuthoritativeGameServer : IGameServerHost
 
             foreach (ProtocolMessage response in responses)
             {
-                bool sent = await _transport.SendAsync(eventArgs.ClientId, response);
+                bool sent = await _transport
+                    .SendAsync(eventArgs.ClientId, response)
+                    .ConfigureAwait(false);
                 if (!sent)
                 {
                     PublishActivity(
@@ -110,6 +116,8 @@ public sealed class AuthoritativeGameServer : IGameServerHost
                     return;
                 }
             }
+
+            _handler.ReleaseDeliveredSession(eventArgs.ClientId, responses);
 
             PublishActivity(
                 $"Processed {request.GetType().Name} for client {eventArgs.ClientId}.");
@@ -139,7 +147,19 @@ public sealed class AuthoritativeGameServer : IGameServerHost
         string description) =>
         await _transport.SendAsync(
             clientId,
-            new ErrorResponse(Guid.NewGuid(), null, code, description));
+            new ErrorResponse(Guid.NewGuid(), null, code, description)).ConfigureAwait(false);
+
+    private void OnListeningFailed(object? sender, ListeningFailedEventArgs eventArgs)
+    {
+        try
+        {
+            Faulted?.Invoke(this, new ServerFaultEventArgs(eventArgs.Reason));
+        }
+        catch
+        {
+            // Presentation subscribers cannot compromise server operation.
+        }
+    }
 
     private void PublishActivity(string message)
     {

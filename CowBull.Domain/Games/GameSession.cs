@@ -212,7 +212,7 @@ public sealed class GameSession
     {
         if (_status == GameStatus.Active && observedAt - StartedAt >= Configuration.Timeout)
         {
-            Complete(GameStatus.TimedOut, observedAt);
+            Complete(GameStatus.TimedOut, StartedAt + Configuration.Timeout);
         }
     }
 

@@ -157,7 +157,7 @@ public sealed partial class ClientViewModel : ObservableObject, IAsyncDisposable
         _client.StatusChanged -= OnStatusChanged;
         _client.Faulted -= OnFaulted;
         CancelResponseTimeout();
-        await _client.DisposeAsync();
+        await _client.DisposeAsync().ConfigureAwait(false);
     }
 
     private void RefreshCommands()

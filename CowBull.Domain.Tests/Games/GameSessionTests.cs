@@ -63,6 +63,41 @@ public sealed class GameSessionTests
     }
 
     [Fact]
+    public void Winning_guess_on_the_final_attempt_is_won_with_no_attempts_left()
+    {
+        var game = CreateGame("0123", maxAttempts: 1);
+
+        var result = game.SubmitGuess("0123", StartedAt.AddSeconds(1));
+
+        Assert.Equal(GameStatus.Won, result.Game.Status);
+        Assert.Equal(0, result.Game.RemainingAttempts);
+        Assert.Equal("0123", result.Game.SecretNumber);
+    }
+
+    [Fact]
+    public void Late_timeout_observation_records_the_deadline()
+    {
+        var game = CreateGame("0123", timeout: TimeSpan.FromSeconds(30));
+
+        var snapshot = game.GetSnapshot(StartedAt.AddMinutes(9));
+
+        Assert.Equal(GameStatus.TimedOut, snapshot.Status);
+        Assert.Equal(StartedAt.AddSeconds(30), snapshot.EndedAt);
+        Assert.Equal(0, snapshot.RemainingAttempts);
+    }
+
+    [Fact]
+    public void Abandon_at_the_deadline_stays_timed_out()
+    {
+        var game = CreateGame("0123", timeout: TimeSpan.FromSeconds(30));
+
+        var snapshot = game.Abandon(StartedAt.AddSeconds(45));
+
+        Assert.Equal(GameStatus.TimedOut, snapshot.Status);
+        Assert.Equal(StartedAt.AddSeconds(30), snapshot.EndedAt);
+    }
+
+    [Fact]
     public void Observing_at_timeout_marks_game_timed_out_without_an_attempt()
     {
         var game = CreateGame("0123", timeout: TimeSpan.FromSeconds(30));

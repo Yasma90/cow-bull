@@ -26,17 +26,20 @@ public sealed class GameServiceTests
     }
 
     [Fact]
-    public void SubmitGuess_removes_terminal_game_and_returns_result()
+    public void SubmitGuess_keeps_a_won_game_until_it_is_ended()
     {
         var context = CreateContext();
         context.Service.StartGame(Configuration());
         context.Clock.SetUtcNow(StartedAt.AddSeconds(1));
 
         var result = context.Service.SubmitGuess(GameId, "0123");
+        var ended = context.Service.EndGame(GameId);
 
         Assert.Equal(GameStatus.Won, result.Game.Status);
         Assert.Equal(4, result.Attempt.Score.Bulls);
-        Assert.Equal(0, context.Repository.UpdateCount);
+        Assert.Equal(GameStatus.Won, ended.Status);
+        Assert.Equal("0123", ended.SecretNumber);
+        Assert.Equal(1, context.Repository.UpdateCount);
         Assert.Equal(1, context.Repository.RemoveCount);
         Assert.Null(context.Repository.GetById(GameId));
     }
@@ -60,15 +63,16 @@ public sealed class GameServiceTests
     {
         var context = CreateContext();
         context.Service.StartGame(Configuration(timeout: TimeSpan.FromSeconds(10)));
-        context.Clock.SetUtcNow(StartedAt.AddSeconds(10));
+        context.Clock.SetUtcNow(StartedAt.AddSeconds(20));
 
         var snapshot = context.Service.GetGame(GameId);
 
         Assert.Equal(GameStatus.TimedOut, snapshot.Status);
+        Assert.Equal(StartedAt.AddSeconds(10), snapshot.EndedAt);
         Assert.Equal("0123", snapshot.SecretNumber);
-        Assert.Equal(0, context.Repository.UpdateCount);
-        Assert.Equal(1, context.Repository.RemoveCount);
-        Assert.Null(context.Repository.GetById(GameId));
+        Assert.Equal(1, context.Repository.UpdateCount);
+        Assert.Equal(0, context.Repository.RemoveCount);
+        Assert.NotNull(context.Repository.GetById(GameId));
     }
 
     [Fact]
@@ -88,19 +92,22 @@ public sealed class GameServiceTests
     }
 
     [Fact]
-    public void SubmitGuess_at_timeout_returns_typed_terminal_snapshot_and_removes_game()
+    public void SubmitGuess_at_timeout_can_be_observed_again_until_the_game_is_ended()
     {
         var context = CreateContext();
         context.Service.StartGame(Configuration(timeout: TimeSpan.FromSeconds(10)));
-        context.Clock.SetUtcNow(StartedAt.AddSeconds(10));
+        context.Clock.SetUtcNow(StartedAt.AddSeconds(20));
 
-        GameInactiveException exception = Assert.Throws<GameInactiveException>(
+        GameInactiveException first = Assert.Throws<GameInactiveException>(
+            () => context.Service.SubmitGuess(GameId, "0123"));
+        GameInactiveException second = Assert.Throws<GameInactiveException>(
             () => context.Service.SubmitGuess(GameId, "0123"));
 
-        Assert.Equal(GameStatus.TimedOut, exception.Game.Status);
-        Assert.Equal("0123", exception.Game.SecretNumber);
-        Assert.Equal(1, context.Repository.RemoveCount);
-        Assert.Null(context.Repository.GetById(GameId));
+        Assert.Equal(GameStatus.TimedOut, first.Game.Status);
+        Assert.Equal(StartedAt.AddSeconds(10), first.Game.EndedAt);
+        Assert.Equal(first.Game.SecretNumber, second.Game.SecretNumber);
+        Assert.NotNull(context.Repository.GetById(GameId));
+        Assert.Equal(0, context.Repository.RemoveCount);
     }
 
     [Fact]
@@ -169,6 +176,11 @@ public sealed class GameServiceTests
 
         public void Update(GameSession game)
         {
+            if (!_games.ContainsKey(game.GameId))
+            {
+                throw new KeyNotFoundException($"Game '{game.GameId}' does not exist.");
+            }
+
             _games[game.GameId] = game;
             UpdateCount++;
         }

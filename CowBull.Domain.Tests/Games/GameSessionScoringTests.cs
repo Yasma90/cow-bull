@@ -9,6 +9,8 @@ public sealed class GameSessionScoringTests
     [InlineData("1234", "1234", 4, 0)]
     [InlineData("1234", "4321", 0, 4)]
     [InlineData("1234", "1567", 1, 0)]
+    [InlineData("1234", "1243", 2, 2)]
+    [InlineData("1234", "1111", 1, 0)]
     [InlineData("0012", "0100", 1, 2)]
     [InlineData("1122", "2211", 0, 4)]
     [InlineData("1122", "1111", 2, 0)]

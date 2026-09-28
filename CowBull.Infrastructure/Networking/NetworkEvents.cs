@@ -83,6 +83,17 @@ public sealed class ClientDisconnectedEventArgs : EventArgs
     public DateTimeOffset Timestamp { get; }
 }
 
+public sealed class ListeningFailedEventArgs : EventArgs
+{
+    public ListeningFailedEventArgs(string reason)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+        Reason = reason;
+    }
+
+    public string Reason { get; }
+}
+
 public sealed class ClientMessageReceivedEventArgs : EventArgs
 {
     public ClientMessageReceivedEventArgs(Guid clientId, string message)

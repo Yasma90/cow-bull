@@ -108,16 +108,17 @@ public sealed partial class ClientViewModel
         AttemptsRemaining = Math.Max(0, _maximumAttempts - response.AttemptNumber);
         IsGameActive = !response.IsComplete;
         _isSessionSynchronized = !response.IsComplete;
+        CompleteRequest();
         if (!response.IsComplete)
         {
-            CompleteRequest();
+            StatusMessage = $"{response.Bulls} bulls, {response.Cows} cows.";
+            return;
         }
 
+        _sessionId = null;
         StatusMessage = response.IsWon
-            ? "Correct. Waiting for the final game result..."
-            : response.IsComplete
-                ? "No attempts remain. Waiting for the final game result..."
-                : $"{response.Bulls} bulls, {response.Cows} cows.";
+            ? $"You won in {response.AttemptNumber} attempts. Secret: {response.RevealedSecret}."
+            : $"Game over. Secret: {response.RevealedSecret}.";
     }
 
     private void ApplyGameEnded(GameEndedResponse response)

@@ -129,7 +129,9 @@ public sealed record GuessResponse : ProtocolMessage
         int cows,
         int attemptNumber,
         bool isComplete,
-        bool isWon)
+        bool isWon,
+        string? revealedSecret = null,
+        GameEndReason? endReason = null)
         : base(messageId)
     {
         SessionId = ProtocolValidation.RequiredId(sessionId, nameof(sessionId));
@@ -146,6 +148,39 @@ public sealed record GuessResponse : ProtocolMessage
         if (isWon && !isComplete)
         {
             throw new ArgumentException("A winning result must also be complete.", nameof(isComplete));
+        }
+
+        if (isComplete)
+        {
+            if (revealedSecret is null)
+            {
+                throw new ArgumentException(
+                    "A completed guess must reveal its secret.",
+                    nameof(revealedSecret));
+            }
+
+            RevealedSecret = ProtocolValidation.Guess(revealedSecret, nameof(revealedSecret));
+            if (RevealedSecret.Length != Guess.Length)
+            {
+                throw new ArgumentException(
+                    "The revealed secret must have the same length as the guess.",
+                    nameof(revealedSecret));
+            }
+
+            EndReason = endReason switch
+            {
+                GameEndReason.Won when isWon => GameEndReason.Won,
+                GameEndReason.AttemptsExhausted when !isWon => GameEndReason.AttemptsExhausted,
+                _ => throw new ArgumentException(
+                    "A completed guess must reveal a won or exhausted result.",
+                    nameof(endReason)),
+            };
+        }
+        else if (revealedSecret is not null || endReason is not null)
+        {
+            throw new ArgumentException(
+                "An active guess cannot reveal a secret or an end reason.",
+                nameof(revealedSecret));
         }
 
         IsComplete = isComplete;
@@ -166,9 +201,25 @@ public sealed record GuessResponse : ProtocolMessage
 
     public bool IsWon { get; }
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? RevealedSecret { get; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public GameEndReason? EndReason { get; }
+
     internal override void Validate()
     {
-        _ = new GuessResponse(MessageId, SessionId, Guess, Bulls, Cows, AttemptNumber, IsComplete, IsWon);
+        _ = new GuessResponse(
+            MessageId,
+            SessionId,
+            Guess,
+            Bulls,
+            Cows,
+            AttemptNumber,
+            IsComplete,
+            IsWon,
+            RevealedSecret,
+            EndReason);
     }
 }
 

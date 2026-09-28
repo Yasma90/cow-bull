@@ -29,6 +29,7 @@ public sealed class ServerViewModel : ObservableObject, IAsyncDisposable
         _dispatcher = dispatcher;
         _endpoint = server.Endpoint;
         _server.ActivityOccurred += OnActivityOccurred;
+        _server.Faulted += OnFaulted;
 
         StartCommand = new AsyncRelayCommand(
             StartAsync,
@@ -135,6 +136,16 @@ public sealed class ServerViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
+    private void OnFaulted(object? sender, ServerFaultEventArgs eventArgs) =>
+        _dispatcher.Post(
+            () =>
+            {
+                IsRunning = false;
+                ConnectedClients = 0;
+                ServerStatus = eventArgs.Message;
+                AddActivity(eventArgs.Message);
+            });
+
     private void OnActivityOccurred(object? sender, ServerActivityEventArgs eventArgs)
     {
         bool shouldSchedule;
@@ -207,6 +218,7 @@ public sealed class ServerViewModel : ObservableObject, IAsyncDisposable
         }
 
         _server.ActivityOccurred -= OnActivityOccurred;
-        await _server.DisposeAsync();
+        _server.Faulted -= OnFaulted;
+        await _server.DisposeAsync().ConfigureAwait(false);
     }
 }

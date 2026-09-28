@@ -53,11 +53,11 @@ public sealed class GameService : IGameService
         catch (InvalidOperationException exception) when (game.Status != GameStatus.Active)
         {
             GameSnapshot terminalGame = game.GetSnapshot(now);
-            _repository.Remove(game.GameId);
+            Persist(game);
             throw new GameInactiveException(terminalGame, exception);
         }
 
-        Persist(game, result.Game);
+        Persist(game);
         return result;
     }
 
@@ -66,7 +66,7 @@ public sealed class GameService : IGameService
         var game = GetRequiredGame(gameId);
         var snapshot = game.GetSnapshot(_timeProvider.GetUtcNow());
 
-        Persist(game, snapshot);
+        Persist(game);
         return snapshot;
     }
 
@@ -78,17 +78,7 @@ public sealed class GameService : IGameService
         return snapshot;
     }
 
-    private void Persist(GameSession game, GameSnapshot snapshot)
-    {
-        if (snapshot.IsTerminal)
-        {
-            _repository.Remove(game.GameId);
-        }
-        else
-        {
-            _repository.Update(game);
-        }
-    }
+    private void Persist(GameSession game) => _repository.Update(game);
 
     private GameSession GetRequiredGame(Guid gameId)
     {

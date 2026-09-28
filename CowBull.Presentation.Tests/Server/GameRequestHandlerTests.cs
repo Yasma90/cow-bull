@@ -77,24 +77,68 @@ public sealed class GameRequestHandlerTests
     }
 
     [Fact]
-    public void Winning_guess_returns_score_then_correlated_terminal_response()
+    public void Winning_guess_returns_score_and_secret_in_one_response()
     {
         var context = CreateContext();
         StartGame(context);
         var requestId = Guid.NewGuid();
 
-        IReadOnlyList<ProtocolMessage> responses = context.Handler.Handle(
-            ClientId,
-            new GuessRequest(requestId, SessionId, "0123"));
+        ProtocolMessage response = Assert.Single(
+            context.Handler.Handle(
+                ClientId,
+                new GuessRequest(requestId, SessionId, "0123")));
 
-        var score = Assert.IsType<GuessResponse>(responses[0]);
-        var ended = Assert.IsType<GameEndedResponse>(responses[1]);
+        var score = Assert.IsType<GuessResponse>(response);
         Assert.True(score.IsComplete);
         Assert.True(score.IsWon);
         Assert.Equal(requestId, score.MessageId);
-        Assert.Equal(requestId, ended.MessageId);
+        Assert.Equal(GameEndReason.Won, score.EndReason);
+        Assert.Equal("0123", score.RevealedSecret);
+        Assert.Equal(1, context.Repository.Count);
+
+        context.Handler.ReleaseDeliveredSession(ClientId, [score]);
+
+        Assert.Equal(0, context.Repository.Count);
+    }
+
+    [Fact]
+    public void Exhausted_guess_returns_the_secret_in_the_score_response()
+    {
+        var context = CreateContext();
+        context.Handler.Handle(
+            ClientId,
+            new NewGameRequest(Guid.NewGuid(), numberLength: 4, maximumAttempts: 1));
+
+        ProtocolMessage response = Assert.Single(
+            context.Handler.Handle(
+                ClientId,
+                new GuessRequest(Guid.NewGuid(), SessionId, "4567")));
+
+        var score = Assert.IsType<GuessResponse>(response);
+        Assert.True(score.IsComplete);
+        Assert.False(score.IsWon);
+        Assert.Equal(GameEndReason.AttemptsExhausted, score.EndReason);
+        Assert.Equal("0123", score.RevealedSecret);
+    }
+
+    [Fact]
+    public void Surrender_after_an_undelivered_win_reveals_the_same_secret()
+    {
+        var context = CreateContext();
+        StartGame(context);
+        context.Handler.Handle(
+            ClientId,
+            new GuessRequest(Guid.NewGuid(), SessionId, "0123"));
+
+        ProtocolMessage response = Assert.Single(
+            context.Handler.Handle(
+                ClientId,
+                new SurrenderRequest(Guid.NewGuid(), SessionId)));
+
+        var ended = Assert.IsType<GameEndedResponse>(response);
         Assert.Equal(GameEndReason.Won, ended.Reason);
         Assert.Equal("0123", ended.RevealedSecret);
+        Assert.Equal(0, context.Repository.Count);
     }
 
     [Fact]

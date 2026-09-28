@@ -44,6 +44,52 @@ public sealed class ServerViewModelTests
         Assert.Contains("Event 204", viewModel.Activity[^1], StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Accept_loop_fault_marks_the_server_stopped()
+    {
+        var server = new FakeGameServerHost();
+        await using var viewModel = new ServerViewModel(server, new ImmediateDispatcher());
+        await viewModel.StartCommand.ExecuteAsync();
+
+        server.RaiseFault("The accept loop stopped unexpectedly.");
+
+        Assert.False(viewModel.IsRunning);
+        Assert.Equal("The accept loop stopped unexpectedly.", viewModel.ServerStatus);
+        Assert.Contains(
+            viewModel.Activity,
+            entry => entry.Contains("accept loop", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task DisposeAsync_completes_when_the_caller_sync_context_is_blocked()
+    {
+        var server = new FakeGameServerHost { YieldOnDispose = true };
+        var viewModel = new ServerViewModel(server, new ImmediateDispatcher());
+        SynchronizationContext? previous = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(new BlockingSynchronizationContext());
+        Task disposeTask;
+        try
+        {
+            disposeTask = viewModel.DisposeAsync().AsTask();
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previous);
+        }
+
+        await disposeTask.WaitAsync(TimeSpan.FromSeconds(2));
+    }
+
+    private sealed class BlockingSynchronizationContext : SynchronizationContext
+    {
+        public override void Post(SendOrPostCallback callback, object? state)
+        {
+        }
+
+        public override void Send(SendOrPostCallback callback, object? state) =>
+            throw new InvalidOperationException("A blocked caller context cannot run the continuation.");
+    }
+
     private sealed class ImmediateDispatcher : IUiDispatcher
     {
         public void Post(Action action) => action();
@@ -70,6 +116,10 @@ public sealed class ServerViewModelTests
     {
         public event EventHandler<ServerActivityEventArgs>? ActivityOccurred;
 
+        public event EventHandler<ServerFaultEventArgs>? Faulted;
+
+        public bool YieldOnDispose { get; init; }
+
         public bool IsRunning { get; private set; }
 
         public int ConnectedClientCount { get; private set; }
@@ -89,11 +139,17 @@ public sealed class ServerViewModelTests
             return Task.CompletedTask;
         }
 
-        public ValueTask DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
             IsRunning = false;
-            return ValueTask.CompletedTask;
+            if (YieldOnDispose)
+            {
+                await Task.Delay(30).ConfigureAwait(false);
+            }
         }
+
+        public void RaiseFault(string message) =>
+            Faulted?.Invoke(this, new ServerFaultEventArgs(message));
 
         public void RaiseActivity(string message) =>
             ActivityOccurred?.Invoke(

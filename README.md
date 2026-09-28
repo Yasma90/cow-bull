@@ -43,7 +43,7 @@ Tests mirror and protect these boundaries. Domain tests exercise rules without I
 
 ### Server-authoritative gameplay
 
-The server owns each game session. It generates and retains the secret number, validates guesses, applies attempt limits, calculates bulls and cows, and decides whether a game has been won or lost. The client submits commands and displays the server's response; it must not calculate authoritative outcomes or receive the secret during an active game.
+The server owns each game session. It generates and retains the secret number, validates guesses, applies attempt limits, calculates bulls and cows, and decides whether a game has been won or lost. The client submits commands and displays the server's response; it must not calculate authoritative outcomes or receive the secret during an active game. A scored guess that ends the game returns one response with both the score and the revealed secret. The server keeps that terminal session until the response is delivered or the client disconnects, so a lost final frame can still be recovered by surrendering.
 
 This boundary keeps the game rules in one place and makes them independently testable. Authoritative rules belong in Domain and Application. Client presentation sends player intent through its client port and never duplicates those rules in a view model or code-behind file.
 

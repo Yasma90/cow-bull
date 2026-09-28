@@ -251,9 +251,24 @@ public sealed partial class AsyncTcpClient : IAsyncDisposable
             return;
         }
 
-        await DisconnectCoreAsync(CancellationToken.None).ConfigureAwait(false);
-        ChangeState(TcpConnectionState.Disposed, "Disposed.");
-        GC.SuppressFinalize(this);
+        try
+        {
+            await DisconnectCoreAsync(CancellationToken.None).ConfigureAwait(false);
+            ChangeState(TcpConnectionState.Disposed, "Disposed.");
+        }
+        finally
+        {
+            await DrainGateAsync(_lifecycleGate).ConfigureAwait(false);
+            await DrainGateAsync(_writeGate).ConfigureAwait(false);
+            GC.SuppressFinalize(this);
+        }
+    }
+
+    private static async ValueTask DrainGateAsync(SemaphoreSlim gate)
+    {
+        await gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+        gate.Release();
+        gate.Dispose();
     }
 
     private async Task DisconnectCoreAsync(CancellationToken cancellationToken)
