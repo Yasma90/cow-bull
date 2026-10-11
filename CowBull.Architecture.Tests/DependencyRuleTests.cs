@@ -56,10 +56,35 @@ public sealed class DependencyRuleTests
     }
 
     [Fact]
+    public void Server_core_depends_on_application_domain_and_infrastructure()
+    {
+        string project = ReadProject("CowBull.Server.Core", "CowBull.Server.Core.csproj");
+
+        Assert.Contains("CowBull.Application", project, StringComparison.Ordinal);
+        Assert.Contains("CowBull.Domain", project, StringComparison.Ordinal);
+        Assert.Contains("CowBull.Infrastructure", project, StringComparison.Ordinal);
+        Assert.DoesNotContain("UseWPF", project, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Server_wpf_host_compiles_only_against_server_core()
+    {
+        string project = ReadProject("CowBullServer.Modern", "CowBullServer.Modern.csproj");
+
+        Assert.Contains("CowBull.Server.Core", project, StringComparison.Ordinal);
+        Assert.DoesNotContain("CowBull.Domain", project, StringComparison.Ordinal);
+        Assert.DoesNotContain("CowBull.Application", project, StringComparison.Ordinal);
+        Assert.DoesNotContain("CowBull.Infrastructure", project, StringComparison.Ordinal);
+        Assert.Contains(
+            "<DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>",
+            project,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Client_project_cannot_compile_against_domain_or_application()
     {
-        string project = File.ReadAllText(
-            Path.Combine(FindRepositoryRoot(), "CowBullClient.Modern", "CowBullClient.Modern.csproj"));
+        string project = ReadProject("CowBullClient.Modern", "CowBullClient.Modern.csproj");
 
         Assert.DoesNotContain("CowBull.Domain", project, StringComparison.Ordinal);
         Assert.DoesNotContain("CowBull.Application", project, StringComparison.Ordinal);
@@ -68,6 +93,9 @@ public sealed class DependencyRuleTests
             project,
             StringComparison.Ordinal);
     }
+
+    private static string ReadProject(string directoryName, string fileName) =>
+        File.ReadAllText(Path.Combine(FindRepositoryRoot(), directoryName, fileName));
 
     private static string FindRepositoryRoot()
     {

@@ -17,6 +17,7 @@ public sealed partial class ClientViewModel : ObservableObject, IAsyncDisposable
     private bool _isBusy;
     private string _connectionStatus = "Disconnected";
     private string _statusMessage = "Connect to a server to begin.";
+    private string _revealedSecret = string.Empty;
     private string _currentGuess = string.Empty;
     private int _numberLength = DefaultNumberLength;
     private int _maximumAttempts = DefaultMaximumAttempts;
@@ -120,6 +121,12 @@ public sealed partial class ClientViewModel : ObservableObject, IAsyncDisposable
     {
         get => _statusMessage;
         private set => SetProperty(ref _statusMessage, value);
+    }
+
+    public string RevealedSecret
+    {
+        get => _revealedSecret;
+        private set => SetProperty(ref _revealedSecret, value);
     }
 
     public string CurrentGuess

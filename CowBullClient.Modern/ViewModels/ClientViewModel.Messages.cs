@@ -77,6 +77,7 @@ public sealed partial class ClientViewModel
         _lastAttemptNumber = 0;
         _isSessionSynchronized = true;
         CurrentGuess = string.Empty;
+        RevealedSecret = string.Empty;
         IsGameActive = true;
         StatusMessage = $"Game started. Guess the {NumberLength}-digit number.";
     }
@@ -116,6 +117,7 @@ public sealed partial class ClientViewModel
         }
 
         _sessionId = null;
+        RevealedSecret = response.RevealedSecret ?? string.Empty;
         StatusMessage = response.IsWon
             ? $"You won in {response.AttemptNumber} attempts. Secret: {response.RevealedSecret}."
             : $"Game over. Secret: {response.RevealedSecret}.";
@@ -134,6 +136,7 @@ public sealed partial class ClientViewModel
         IsGameActive = false;
         _isSessionSynchronized = false;
         _sessionId = null;
+        RevealedSecret = response.RevealedSecret;
         StatusMessage = response.Reason switch
         {
             GameEndReason.Won =>
@@ -162,6 +165,7 @@ public sealed partial class ClientViewModel
         AttemptsRemaining = DefaultMaximumAttempts;
         Attempts.Clear();
         CurrentGuess = string.Empty;
+        RevealedSecret = string.Empty;
         StatusMessage = message;
         RefreshCommands();
     }

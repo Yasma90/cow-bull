@@ -1,11 +1,6 @@
 using System.Windows;
-using CowBull.Application.Games;
-using CowBull.Infrastructure.Games;
-using CowBull.Infrastructure.Identity;
-using CowBull.Infrastructure.Networking;
-using CowBull.Infrastructure.Persistence;
+using CowBull.Server.Core;
 using CowBullServer.Modern.Presentation;
-using CowBullServer.Modern.Services;
 using CowBullServer.Modern.ViewModels;
 
 namespace CowBullServer.Modern;
@@ -19,19 +14,9 @@ public partial class App : Application, IDisposable
     {
         base.OnStartup(e);
 
-        var gameService = new GameService(
-            new InMemoryGameRepository(),
-            new CryptographicSecretNumberGenerator(),
-            new GuidGameIdGenerator(),
-            TimeProvider.System);
-        // Loopback is the secure default while the protocol has no remote
-        // authentication or transport encryption.
-        var configuration = new NetworkConfiguration(
-            readTimeout: TimeSpan.FromMinutes(5));
-        var transport = new AsyncTcpServer(configuration);
-        var handler = new GameRequestHandler(gameService);
-        var server = new AuthoritativeGameServer(transport, handler);
-        _viewModel = new ServerViewModel(server, new WpfUiDispatcher(Dispatcher));
+        _viewModel = new ServerViewModel(
+            ServerHostFactory.CreateLoopbackHost(),
+            new WpfUiDispatcher(Dispatcher));
 
         new MainWindow(_viewModel).Show();
     }
@@ -55,6 +40,7 @@ public partial class App : Application, IDisposable
         {
             Task.Run(() => viewModel.DisposeAsync().AsTask()).GetAwaiter().GetResult();
         }
+
         GC.SuppressFinalize(this);
     }
 }

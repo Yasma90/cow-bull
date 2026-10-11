@@ -13,22 +13,21 @@ The WPF applications require Windows. Install the .NET 10 SDK (or a compatible p
 The layers, from the stable core to the delivery mechanism, are:
 
 ```text
-Domain -> Application -> Infrastructure -> WPF hosts
+Domain -> Application -> Infrastructure -> Server.Core -> WPF hosts
 ```
 
 Compile-time dependencies point inward:
 
 ```text
-CowBullClient.Modern / CowBullServer.Modern
-                    |
-                    v
-          CowBull.Infrastructure
-                    |
-                    v
-           CowBull.Application
-                    |
-                    v
-             CowBull.Domain
+CowBullClient.Modern          CowBullServer.Modern
+        |                              |
+        v                              v
+CowBull.Infrastructure         CowBull.Server.Core
+        |                              |
+        +--------------> CowBull.Application
+                               |
+                               v
+                         CowBull.Domain
 ```
 
 | Layer | Responsibility | Dependency rule |
@@ -36,7 +35,8 @@ CowBullClient.Modern / CowBullServer.Modern
 | `CowBull.Domain` | Game rules, state, scoring, and domain invariants | Depends on no outer layer or UI/network framework |
 | `CowBull.Application` | Use cases and ports for IDs, persistence, and secret generation | Depends on Domain |
 | `CowBull.Infrastructure` | TCP framing, transport configuration, and adapters for Application ports | Depends inward on Application/Domain abstractions |
-| `CowBullServer.Modern` | WPF server host and composition root | Wires Application use cases to Infrastructure |
+| `CowBull.Server.Core` | Authoritative request handling and loopback host composition | Depends on Application, Domain, and Infrastructure. No WPF |
+| `CowBullServer.Modern` | WPF server shell | Depends only on Server.Core |
 | `CowBullClient.Modern` | WPF client host and presentation | Sends player intent and renders server responses |
 
 Tests mirror and protect these boundaries. Domain tests exercise rules without I/O, Application tests exercise use cases through test doubles, Infrastructure tests cover adapters and protocol behavior, Presentation tests cover view models and client/server integration, and Architecture tests enforce the allowed project references.

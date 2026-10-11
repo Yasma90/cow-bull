@@ -3,7 +3,7 @@ using CowBull.Application.Ports;
 using CowBull.Domain.Games;
 using CowBull.Infrastructure.Persistence;
 using CowBull.Infrastructure.Protocol;
-using CowBullServer.Modern.Services;
+using CowBull.Server.Core;
 
 namespace CowBull.Presentation.Tests.Server;
 

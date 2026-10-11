@@ -1,4 +1,4 @@
-namespace CowBullServer.Modern.Services;
+namespace CowBull.Server.Core;
 
 public interface IGameServerHost : IAsyncDisposable
 {

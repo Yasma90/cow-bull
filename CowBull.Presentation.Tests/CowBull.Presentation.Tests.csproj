@@ -24,6 +24,7 @@
     <ProjectReference Include="..\CowBull.Application\CowBull.Application.csproj" />
     <ProjectReference Include="..\CowBull.Domain\CowBull.Domain.csproj" />
     <ProjectReference Include="..\CowBull.Infrastructure\CowBull.Infrastructure.csproj" />
+    <ProjectReference Include="..\CowBull.Server.Core\CowBull.Server.Core.csproj" />
     <ProjectReference Include="..\CowBullClient.Modern\CowBullClient.Modern.csproj" />
     <ProjectReference Include="..\CowBullServer.Modern\CowBullServer.Modern.csproj" />
   </ItemGroup>

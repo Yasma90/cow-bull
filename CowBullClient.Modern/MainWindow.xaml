@@ -30,7 +30,8 @@
             <Button Content="Connect" Command="{Binding ConnectCommand}"
                     MinWidth="92" Padding="12,6" Margin="0,0,8,0"/>
             <Button Content="Disconnect" Command="{Binding DisconnectCommand}"
-                    MinWidth="92" Padding="12,6" Margin="0,0,8,0"/>
+                    MinWidth="92" Padding="12,6" Margin="0,0,8,0"
+                    ToolTip="Abandons the game and does not reveal the secret. Use Surrender to see it."/>
             <Button Content="New game" Command="{Binding NewGameCommand}"
                     MinWidth="92" Padding="12,6"/>
         </StackPanel>
@@ -47,7 +48,11 @@
                      FontFamily="Consolas"
                      FontSize="20"
                      Padding="8,5"
-                     ToolTip="Enter ASCII digits without duplicates"/>
+                     ToolTip="ASCII digits, no duplicates. Press Enter to submit.">
+                <TextBox.InputBindings>
+                    <KeyBinding Key="Enter" Command="{Binding SubmitGuessCommand}"/>
+                </TextBox.InputBindings>
+            </TextBox>
             <Button Grid.Column="1" Content="Submit guess"
                     Command="{Binding SubmitGuessCommand}"
                     Padding="14,6" Margin="8,0,0,0"/>
@@ -56,18 +61,38 @@
                     Padding="14,6" Margin="8,0,0,0"/>
         </Grid>
 
-        <GroupBox Grid.Row="3" Header="Attempts">
+        <DockPanel Grid.Row="3">
+            <TextBlock DockPanel.Dock="Top"
+                       Margin="0,0,0,8"
+                       Text="Bulls: digit in the correct position. Cows: digit present, wrong position."
+                       TextWrapping="Wrap"
+                       Foreground="#FF5C6570"/>
+            <TextBlock DockPanel.Dock="Bottom"
+                       Margin="0,8,0,0"
+                       FontWeight="SemiBold"
+                       Text="{Binding RevealedSecret, StringFormat='Secret: {0}'}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Visible"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding RevealedSecret}" Value="">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
             <ListView ItemsSource="{Binding Attempts}">
                 <ListView.View>
                     <GridView>
                         <GridViewColumn Header="#" Width="45" DisplayMemberBinding="{Binding AttemptNumber}"/>
                         <GridViewColumn Header="Guess" Width="130" DisplayMemberBinding="{Binding Guess}"/>
-                        <GridViewColumn Header="Bulls" Width="90" DisplayMemberBinding="{Binding Bulls}"/>
-                        <GridViewColumn Header="Cows" Width="90" DisplayMemberBinding="{Binding Cows}"/>
+                        <GridViewColumn Header="Bulls" Width="110" DisplayMemberBinding="{Binding Bulls}"/>
+                        <GridViewColumn Header="Cows" Width="110" DisplayMemberBinding="{Binding Cows}"/>
                     </GridView>
                 </ListView.View>
             </ListView>
-        </GroupBox>
+        </DockPanel>
 
         <Grid Grid.Row="4" Margin="0,16,0,0">
             <Grid.ColumnDefinitions>

@@ -1,6 +1,7 @@
 <Window x:Class="CowBullServer.Modern.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:presentation="clr-namespace:CowBullServer.Modern.Presentation"
         Title="CowBull Server"
         Width="760"
         Height="540"
@@ -39,6 +40,7 @@
 
         <GroupBox Grid.Row="2" Header="Activity">
             <ListBox ItemsSource="{Binding Activity}"
+                     presentation:AutoScroll.ToEnd="True"
                      FontFamily="Consolas"
                      ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
         </GroupBox>

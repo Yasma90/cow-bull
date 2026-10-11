@@ -107,6 +107,7 @@ public sealed class ClientViewModelTests
                 attemptsUsed: 0));
 
         Assert.False(context.ViewModel.IsGameActive);
+        Assert.Equal("0123", context.ViewModel.RevealedSecret);
         Assert.Contains("timed out", context.ViewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("0123", context.ViewModel.StatusMessage, StringComparison.Ordinal);
     }
@@ -161,6 +162,7 @@ public sealed class ClientViewModelTests
                 endReason: GameEndReason.Won));
 
         Assert.False(context.ViewModel.IsGameActive);
+        Assert.Equal("0123", context.ViewModel.RevealedSecret);
         Assert.Contains("won", context.ViewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("0123", context.ViewModel.StatusMessage, StringComparison.Ordinal);
     }

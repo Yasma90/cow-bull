@@ -2,7 +2,7 @@ using System.Text.Json;
 using CowBull.Infrastructure.Networking;
 using CowBull.Infrastructure.Protocol;
 
-namespace CowBullServer.Modern.Services;
+namespace CowBull.Server.Core;
 
 /// <summary>
 /// Owns transport lifecycle and processes each client's requests in receive order

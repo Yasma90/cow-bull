@@ -1,5 +1,5 @@
+using CowBull.Server.Core;
 using CowBullServer.Modern.Presentation;
-using CowBullServer.Modern.Services;
 using CowBullServer.Modern.ViewModels;
 
 namespace CowBull.Presentation.Tests.Server;

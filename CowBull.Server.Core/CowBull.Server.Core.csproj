@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
+    <RootNamespace>CowBull.Server.Core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CowBull.Application\CowBull.Application.csproj" />
+    <ProjectReference Include="..\CowBull.Domain\CowBull.Domain.csproj" />
+    <ProjectReference Include="..\CowBull.Infrastructure\CowBull.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

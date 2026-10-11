@@ -4,7 +4,7 @@ using CowBull.Application.Games;
 using CowBull.Domain.Games;
 using CowBull.Infrastructure.Protocol;
 
-namespace CowBullServer.Modern.Services;
+namespace CowBull.Server.Core;
 
 /// <summary>
 /// Maps typed client requests to application use cases and enforces that a
